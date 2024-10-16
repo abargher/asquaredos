@@ -1,7 +1,7 @@
 # asquaredos
 
-A tiny "OS" for the Raspberry Pi Pico implementing timesharing through and
-process switching.
+A tiny "OS" for the Raspberry Pi Pico implementing timesharing through process
+switching.
 
 By: Alec Bargher and Gus Waldspurger
 
