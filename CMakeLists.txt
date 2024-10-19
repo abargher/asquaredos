@@ -45,7 +45,7 @@ pico_generate_pio_header(asquaredos ${CMAKE_CURRENT_LIST_DIR}/blink.pio)
 
 # Modify the below lines to enable/disable output over UART/USB
 pico_enable_stdio_uart(asquaredos 1)
-pico_enable_stdio_usb(asquaredos 0)
+pico_enable_stdio_usb(asquaredos 1)
 
 # Add the standard library to the build
 target_link_libraries(asquaredos
@@ -59,14 +59,6 @@ target_include_directories(asquaredos PRIVATE
 
 # Add any user requested libraries
 target_link_libraries(asquaredos 
-        hardware_spi
-        hardware_i2c
-        hardware_dma
-        hardware_pio
-        hardware_interp
-        hardware_timer
-        hardware_watchdog
-        hardware_clocks
         )
 
 pico_add_extra_outputs(asquaredos)
