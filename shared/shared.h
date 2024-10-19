@@ -8,5 +8,6 @@
 
 pcb_t           *pcb_active         __attribute__((section("shared_variables")));
 heap_region_t   *heap_free_list     __attribute__((section("shared_variables")));
+void            *heap_start         __attribute__((section("shared_variables")));
 
 #endif /* __SHARED_H__ */
