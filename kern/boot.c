@@ -10,13 +10,17 @@
 /* TODO find good value. */
 #define STACK_SIZE 4 * KB
 
+/* Byte granularity at which the MPU can protect a region of memory. */
+#define MPU_REGION_GRANULARITY_BITS 8
+#define MPU_REGION_GRANULARITY 1 << (MPU_REGION_GRANULARITY_BITS)
+
 #define NULL (void *)0
 
 /*
- * Layout of our shared kernel state, defined by the linker script.
+ * Layout of our private kernel state, defined by the linker script.
  */
-extern char __shared_variables_start;
-extern char __shared_variables_end;
+extern char __kernel_private_state_start;
+extern char __kernel_private_state_end;
 
 /*
  * TODO: find out if the RAM section of the .elf can be modified at runtime
@@ -37,23 +41,19 @@ create_system_resources(
     void *flash_elf_const_section,
     void *flash_elf_bss_section)
 {
-    /* fun note for later: this will point to self, do we need allocated list head any more? */
-    pcb_t *pcb = kalloc(sizeof(pcb_t), NULL);
-    assert(pcb);    /* TODO implement assert that panics if false. */
+    pcb_t *pcb = (pcb_t *)zalloc(KZONE_PCB);
+    assert(pcb != NULL);
 
     /*
-     * This PCB itself is the first thing we've allocated, and becomes the head
-     * of the allocated list.
+     * The PCB starts with no allocated memory.
      */
-    LL_INSERT(pcb->allocated, pcb - sizeof(heap_region_t)); /* TODO implement LL macros. */
+    pcb->allocated->next = NULL;
+    pcb->allocated->prev = NULL;
 
     /*
      * Make this PCB schedulable.
      */
-    if (pcb_active == NULL) {
-        pcb_active = pcb;
-    }
-    LL_INSERT_CIRCULAR(pcb_active->sched_next, pcb);    /* TODO implement macro, and should probably insert onto the end of the list..? */
+    FIFO_DLL_PUSH_CIRCULAR(pcb_active, pcb, next, prev); /* TODO implement me. */
 
     /*
      * TODO: Allocate sizeof(data + bss) then copy const into data (or something to that effect, todo figure this out).
@@ -78,16 +78,21 @@ int
 main(void)
 {
     /*
-     * Initialize the allocator.
+     * Initialize the zone allocator.
      */
-    heap_start = (void *)&__shared_variables_end;
+    zinit();
+
+    /*
+     * The heap will begin aligned with the first MPU-protectable address after
+     * the kernel private state section ends. The heaps begins as a singleton
+     * free element.
+     */
+    heap_start = &__kernel_private_state_end + ((uint32_t)&__kernel_private_state_end % MPU_REGION_GRANULARITY);
     heap_free_list = (heap_region_t *)heap_start;
     heap_free_list->next = NULL;
     heap_free_list->prev = NULL;
     heap_free_list->size = SRAM_SIZE - (uint32_t)(&__shared_variables_end - SRAM_START);
 
     /* Get programs to run, and their sizes..? */
-    
-
 
 }
