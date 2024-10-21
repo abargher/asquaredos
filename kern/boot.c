@@ -87,11 +87,12 @@ main(void)
      * the kernel private state section ends. The heaps begins as a singleton
      * free element.
      */
-    heap_start = &__kernel_private_state_end + ((uint32_t)&__kernel_private_state_end % MPU_REGION_GRANULARITY);
+    heap_start = &__kernel_private_state_end + (MPU_REGION_GRANULARITY -
+        (uint32_t)&__kernel_private_state_end % MPU_REGION_GRANULARITY);
     heap_free_list = (heap_region_t *)heap_start;
     heap_free_list->next = NULL;
     heap_free_list->prev = NULL;
-    heap_free_list->size = SRAM_SIZE - (uint32_t)(&__shared_variables_end - SRAM_START);
+    heap_free_list->size = SRAM_SIZE - (uint32_t)(&__kernel_private_state_end - SRAM_START);
 
     /* Get programs to run, and their sizes..? */
 

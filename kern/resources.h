@@ -14,7 +14,6 @@
 #include <stdint.h>
 
 #define KERNEL_STATE_SECTION "kernel_private_state"
-#define KERNEL_ZALLOC_SECTION "kernel_allocator_zones"
 
 /*
  * Reservation of global kernel variables.
@@ -27,6 +26,6 @@ void            *heap_start         __attribute__((section(KERNEL_STATE_SECTION)
 /*
  * Reservation of all memory (zones) belonging to the zone allocator.
  */
-pcb_t   kzone_pcb   __attribute__((section(KERNEL_ZALLOC_SECTION)));
+pcb_t   kzone_pcb   __attribute__((section(KERNEL_STATE_SECTION)));
 
 #endif /* __RESOURCES_H__ */
