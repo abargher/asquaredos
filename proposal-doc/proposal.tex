@@ -22,101 +22,97 @@
 
 \section{Introduction}
 \os is a minimal ``operating system'' for the RP2040 microcontroller, providing
-context switching and process scheduling, thus enabling seamless
-multiprogramming (to a degree). Although we are implementing the system using
-the Raspberry Pi Pico board, we hope that \os will be compatible with any board
-using the RP2040 chip, with little to no modification.
+context switching and process scheduling, enabling seamless multiprogramming.
+Although the system is implemented using a Raspberry Pi Pico, we hope that \os
+will be compatible with any application of the RP2040 chip with minimal
+modification.
 \vspace{1em}
 
-\os consists of a small kernel process, responsible
-only for managing the setup and teardown of ``user'' processes, scheduling those
-processes, handling heap allocations or other exceptions. Users of the system
-will be able to load the kernel onto the board once, and flash a set of
-(specially compiled/linked) user programs onto the board afterwards. The kernel
-process does not perform actions outside of interrupt handling and initial boot
-setup, so it does not need to be scheduled explicitly.
+\os implements a minimal kernel, responsible for creating, destroying, and
+scheduling ``user'' processes. Basic utilities are also provided for these
+processes, in the form of system calls to acquire and release memory. As the
+kernel performs no background tasks, its code is only executed asynchronously
+after the initial boot sequence is completed, whenever users or system resources
+trigger an interrupt. Users will load the kernel onto the board once, and may
+then flash an arbitrary set of user programs specifically compiled and linked
+for compatibility with \os.
 
 \section{Motivation}
 
-\os is largely motivated by the desire to more simply share CPU time on an ARM
-Cortex M0+ processor. Processors of this architecture, especially the RP2040,
-are quite powerful for their extremely low cost, size, and power draw, making
-them quite appropriate for even complex embedded use cases. However, taking
-advantage of this power can be challenging when the burden of sharing the CPU
-between independent programs or processes is placed entirely on the programmer.
-This is where \os comes in.
+\os is largely motivated by the desire to share CPU time on an ARM Cortex M0+
+processor. This architecture--of which the RP2040 is notable example--offer a
+powerful compute platform while maintaining extremely low cost and power
+requirements. Processors like the RP2040 are thus desirable for a variety of
+complex embedded applications. However, properly taking advantage of the
+power these processors offer can be challenging and impractical due to the
+burden of CPU management being placed entirely on the programmer. \os Hopes to
+solve this issue.
 
-With \osns, the programmer is now only responsible for handling the sharing
-and/or synchronization of other system resources, but not the CPU itself.
-Especially when the desired processes can be implemented such that they do not
-share other hardware resources, the burden of CPU timesharing can be eliminated.
+With \osns, CPU management is abstracted away; the programmer is now responsible
+only for the sharing and synchronization of other, more diverse system
+resources (e.g., I/O).
 
 
 \section{System Design}
 \subsection{Kernel layout}
-Our design decisions are made primarily to reduce complexity while handling the
-constraints of the RP2040 platform, the largest of which is the lack of hardware
-support for virtual memory. This is common for microcontrollers, so embedded
-programs deal with hardware memory addresses directly. This drives our first
-design decision: the kernel lives at the top of physical memory, with fixed
-memory addresses for its critical global variables and structures, and a
-fixed-size stack for its few function calls. In this fixed-size space, the
+In designing \os, we prioritized reducing complexity, while also handling the
+constraints of the RP2040 platform--the largest of which is the lack of hardware
+support for virtual memory. Virtual memory in uncommon for microcontrollers, so
+embedded programs typically deal with hardware memory addresses directly.
+Lacking the isolation afforded by virtual memory, we chose to place the kernel
+at the top of physical memory, with fixed memory addresses for its critical
+global variables and structures, and a fixed-size stack for its few function
+calls. By fixing the size and location of the kernel, the memory protection unit
+(MPU) can be used to minimally isolate kernel state from userspace programs. The
 kernel maintains structures for tracking
 \begin{itemize}
     \item {A pointer to the process control block (PCB) of the currently active
     process,}
     \item A pointer to the scheduler's ready queue,
     \item A pointer to the heap allocator's free blocks list,
-    \item The zone allocated for the PCBs of all processes,
+    \item Memory zones and associated metadata for use by the zone allocator,
 \end{itemize}
-among other state the kernel must maintain.
+among the other state the kernel must maintain.
 %% Continue with more on kernel layout here...
 
 \subsection{Memory Allocation}
-The Pi Pico, like
-many other microcontrollers, maps its peripherals and other hardware components
-to memory addresses in an extended address space (i.e., larger than the total
-physical memory). However, programs written for \os should not need to access
-direct memory addresses that are mapped to actual memory. Hardware peripherals
-accessed by their memory-mapped addresses are not currently managed by \osns.
+The Pi Pico, like many other microcontrollers, maps its peripherals and other
+hardware components to memory addresses in an extended address space which
+exceeds the total size of physical memory. Hardware peripherals accessed by
+their memory-mapped addresses are not currently managed by \osns.
 
-This affordance is given by \osns's heap allocator and fixed per-process stack
-size, which is currently set at 4KB. The heap allocator is one of \osns's
-primary features. It is split into two versions-- the zone allocator and the
-heap allocator.
+The kernel's state is largely organized as a series of zones, which are managed
+by a zone allocator. The zone allocator is used only by the kernel to allocate
+fixed-size elements from these pre-allocated zones of kernel memory, organized
+by element type. This system is currently only used to maintain PCBs, but is
+general and may be trivially expanded with additional zones.
 
-The zone allocator is used only by the kernel to allocate a fixed size section
-of memory that can be split into uniform, fixed-size pieces. We refer to this
-section as a ``zone.'' This is currently only used to maintain PCBs, but the
-zone allocator is implemented generally, such that it is trivial to add
-additional zones.
+All physical memory (SRAM) not occupied by the kernel is managed by a
+kernel-private heap allocator, which is utilized whenever process-owned memory
+must be allocated. For example, the heap is used to allocate each process's
+fixed size (4KB) stack at the time of that process's creation. Note that code
+sections of a process are stored in executable flash (XIP) storage, rather than
+in memory. Processes may also explicitly request and release memory via system
+call, which is ultimately managed via the same kernel-private heap. The
+implementation of an efficient userspace heap is left as a responsibility for
+the programmer.
 
-The heap allocator is handled by the kernel, but user programs are given access
-to this allocator through a library which accesses a set of kernel system calls,
-namely \texttt{palloc()} and \texttt{pfree()}. These calls will be used whenever
-the kernel needs to allocated memory on behalf of another process. This includes
-process sections (stack, data, etc.) and process-level heap allocations.
-
-All of SRAM outside of the kernel's reserved space is treated
-as one single shared heap. When a process is created, the kernel will use the
-heap allocator to allocate space for its stack and data segment\footnote{When
-possible, we plan to keep text segments for both the kernel and user programs in
-execute-in-place (XIP) flash memory, in order to save precious space in SRAM.}.
-When a user program wishes to dynamically allocate heap memory, it may obtain
-a block of memory on this shared heap through the library call, ultimate 
-resulting in the kernel calling \texttt{palloc()}.\footnote{Note
-that the allocator is (currently) an extremely simple one. It makes no attempts
-to reduce fragmentation, and will choose the first available block on the heap
-that can fit the requested memory.}\fnsep\footnote{Security-minded readers may
-also notice that because the entire heap is shared between all processes (plus
-the kernel), there is no isolation of heap space between any processes. This is
-a downside, but because of the constraints of our embedded environment, we have
-left handling the lack of isolation between processes to the programmer.}
-
+\footnote{Note
+that the kernel's heap allocator is (currently) an extremely simple one. It
+makes no attempts to reduce fragmentation, and will choose the first available
+block on the heap that can fit the requested memory.}\fnsep
+\footnote{Security-minded readers may also notice that because the kernel doles
+out memory from the entirety of SRAM (except the kernel's private state), there
+is no isolation of any in-memory process data between processes. While this is
+unfortunate, it is ultimately unavoidable due to the MPU's limit of protecting
+just 8 regions--insufficient to provide proper protection to each block of
+memory allocated by the kernel for a user process. Handling this lack of
+isolation is thus made the responsibility of the programmer and system
+operator.}
 
 %% Add more miscellaneous elements here, or add more sections above this line.
 \subsection{Other design elements}
 As long as users are careful to only flash programs set up properly for \osns,
-then the kernel will not need to be reflashed.
+then the kernel will not need to be re-flashed.
 
 \end{document}
