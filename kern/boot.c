@@ -32,14 +32,16 @@ extern char __kernel_private_state_end;
  *       allocating text/data/bss.
  */
 inline
-int
+void
 create_system_resources(
     uint32_t text_size,
     uint32_t data_size,
     uint32_t bss_size,
+    uint32_t got_size,
     void *flash_elf_text_section,
     void *flash_elf_const_section,
-    void *flash_elf_bss_section)
+    void *flash_elf_bss_section,
+    void *flash_elf_got_section)
 {
     pcb_t *pcb = (pcb_t *)zalloc(KZONE_PCB);
     assert(pcb != NULL);
@@ -59,15 +61,25 @@ create_system_resources(
      * TODO: Allocate sizeof(data + bss) then copy const into data (or something to that effect, todo figure this out).
      */
 
+
     /*
      * Initialize special-purpose registers.
+     *
+     * TODO: one of us needs to come through and find the right initial values
+     *       based on what the datasheet says.
      */
-    pcb->registers.sp = kalloc(STACK_SIZE, pcb);
+    pcb->registers.sp = palloc(STACK_SIZE, pcb);
     assert(pcb->registers.sp);      /* TODO implement assert that panics if false. */
     pcb->registers.pc = flash_elf_text_section;
+    pcb->registers.control = CONTROL_UNPRIVILEGED;  /* TODO get from SDK. */
+    pcb->registers.primask = PRIORITY_MASK_DEFAULT; /* TODO decide on a default. */
+    pcb->registers.psr = 0;                         /* TODO deicde on initial value. */
+    pcb->registers.lr = 0;                          /* TODO decide on initial value. */
 
-
-
+    /*
+     * At this point this process should be ready-to-run when the scheduler
+     * selects this process control block to run.
+     */
 }
 
 /*
