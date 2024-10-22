@@ -6,9 +6,7 @@
  * Copied almost entirely from a presentation which details the context switch
  * logic for Chromium EC on Cortex M platforms, which can be found here:
  *
- *      https://archive.fosdem.org/2018/schedule/event/multitasking_on_cortexm/
- *      attachments/slides/2602/export/events/attachments/multitasking_on_cortex
- *      m/slides/2602/Slides.pdf
+ *      https://archive.fosdem.org/2018/schedule/event/multitasking_on_cortexm/attachments/slides/2602/export/events/attachments/multitasking_on_cortexm/slides/2602/Slides.pdf
  */
 
 schedule_handler:
