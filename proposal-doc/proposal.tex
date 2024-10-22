@@ -48,7 +48,8 @@ This is where \os comes in.
 
 With \osns, the programmer is now only responsible for handling the sharing
 and/or synchronization of other system resources, but not the CPU itself.
-Especially when the desired processes can be 
+Especially when the desired processes can be implemented such that they do not
+share other hardware resources, the burden of CPU timesharing can be eliminated.
 
 
 \section{System Design}
@@ -69,6 +70,7 @@ kernel maintains structures for tracking
     \item The zone allocated for the PCBs of all processes,
 \end{itemize}
 among other state the kernel must maintain.
+%% Continue with more on kernel layout here...
 
 \subsection{Memory Allocation}
 The Pi Pico, like
@@ -107,6 +109,7 @@ a downside, but because of the constraints of our embedded environment, we have
 left handling the lack of isolation between processes to the programmer.}.
 
 
+%% Add more miscellaneous elements here, or add more sections above this line.
 \subsection{Other design elements}
 As long as users are careful to only flash programs set up properly for \osns,
 then the kernel will not need to be reflashed.
