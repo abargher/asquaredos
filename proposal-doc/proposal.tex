@@ -1,16 +1,17 @@
-\documentclass[11pt]{article}
-\usepackage[colorlinks,urlcolor=blue]{hyperref}
-\usepackage{amsmath,amsfonts,graphicx,amssymb}
-\usepackage{latexsym}
-\usepackage{subfig}
-\usepackage{svg}
-\usepackage{enumitem}
-\usepackage{adjmulticol}
-\usepackage{listings}
+\documentclass[12pt]{article}
+\usepackage[colorlinks,allcolors=blue]{hyperref}
+% \usepackage{amsmath,amsfonts,graphicx,amssymb}
+% \usepackage{latexsym}
+% \usepackage{subfig}
+% \usepackage{svg}
+% \usepackage{enumitem}
+% \usepackage{adjmulticol}
+% \usepackage{listings}
 \usepackage{fullpage}
-\usepackage{color}
 
+\newcommand\fnsep{\textsuperscript{,}}
 \newcommand{\os}{\texttt{A$^2$OS} }
+\newcommand{\osns}{\texttt{A$^2$OS}}
 
 \title{\texttt{A$^2$OS}: a minimal ``OS'' for the Raspberry Pi Pico}
 \author{Alec Bargher and Gus Waldspurger}
@@ -20,8 +21,94 @@
 \maketitle
 
 \section{Introduction}
-\os is a minimal ``operating system'' for the Raspberry Pi Pico, providing
-context switching and process scheduling, thus enabling multiprogramming.
+\os is a minimal ``operating system'' for the RP2040 microcontroller, providing
+context switching and process scheduling, thus enabling seamless
+multiprogramming (to a degree). Although we are implementing the system using
+the Raspberry Pi Pico board, we hope that \os will be compatible with any board
+using the RP2040 chip, with little to no modification.
+\vspace{1em}
 
+\os consists of a small kernel process, responsible
+only for managing the setup and teardown of ``user'' processes, scheduling those
+processes, handling heap allocations or other exceptions. Users of the system
+will be able to load the kernel onto the board once, and flash a set of
+(specially compiled/linked) user programs onto the board afterwards. The kernel
+process does not perform actions outside of interrupt handling and initial boot
+setup, so it does not need to be scheduled explicitly.
+
+\section{Motivation}
+
+\os is largely motivated by the desire to more simply share CPU time on an ARM
+Cortex M0+ processor. Processors of this architecture, especially the RP2040,
+are quite powerful for their extremely low cost, size, and power draw, making
+them quite appropriate for even complex embedded use cases. However, taking
+advantage of this power can be challenging when the burden of sharing the CPU
+between independent programs or processes is placed entirely on the programmer.
+This is where \os comes in.
+
+With \osns, the programmer is now only responsible for handling the sharing
+and/or synchronization of other system resources, but not the CPU itself.
+Especially when the desired processes can be 
+
+
+\section{System Design}
+\subsection{Kernel layout}
+Our design decisions are made primarily to reduce complexity while handling the
+constraints of the RP2040 platform, the largest of which is the lack of hardware
+support for virtual memory. This is common for microcontrollers, so embedded
+programs deal with hardware memory addresses directly. This drives our first
+design decision: the kernel lives at the top of physical memory, with fixed
+memory addresses for its critical global variables and structures, and a
+fixed-size stack for its few function calls. In this fixed-size space, the
+kernel maintains structures for tracking
+\begin{itemize}
+    \item {A pointer to the process control block (PCB) of the currently active
+    process,}
+    \item A pointer to the scheduler's ready queue,
+    \item A pointer to the heap allocator's free blocks list,
+    \item The zone allocated for the PCBs of all processes,
+\end{itemize}
+among other state the kernel must maintain.
+
+\subsection{Memory Allocation}
+The Pi Pico, like
+many other microcontrollers, maps its peripherals and other hardware components
+to memory addresses in an extended address space (i.e., larger than the total
+physical memory). However, programs written for \os should not need to access
+direct memory addresses that are mapped to actual memory. Hardware peripherals
+accessed by their memory-mapped addresses are not currently managed by \osns.
+
+This affordance is given by \osns's heap allocator and fixed per-process stack
+size, which is currently set at 4KB. The heap allocator is one of \osns's
+primary features. It is split into two versions-- the zone allocator and the
+heap allocator.
+
+The zone allocator is used only by the kernel to allocate a fixed size section
+of memory that can be split into uniform, fixed-size pieces. We refer to this
+section as a ``zone.'' This is currently only used to maintain PCBs, but the
+zone allocator is implemented generally, such that it is trivial to add
+additional zones.
+
+The heap allocator is handled by the kernel, but user programs are given access
+to this allocator through a set of system calls, namely \texttt{palloc()} and
+\texttt{pfree()}. All of SRAM outside of the kernel's reserved space is treated
+as one single shared heap. When a process is created, the kernel will use the
+heap allocator to allocate space for its stack and data segment\footnote{When
+possible, we plan to keep text segments for both the kernel and user programs in
+execute-in-place (XIP) flash memory, in order to save precious space in SRAM.}.
+When a user program wishes to dynamically allocate heap memory, it may obtain
+a block of memory on this shared heap through \texttt{palloc()}\footnote{Note
+that the allocator is (currently) an extremely simple one. It makes no attempts
+to reduce fragmentation, and will choose the first available block on the heap
+that can fit the requested memory.}\fnsep\footnote{Security-minded readers may
+also notice that because the entire heap is shared between all processes (plus
+the kernel), there is no isolation of heap space between any processes. This is
+a downside, but because of the constraints of our embedded environment, we have
+left handling the lack of isolation between processes to the programmer.}.
+
+
+\subsection{Other design elements}
+As long as users are careful to only flash programs set up properly for \osns,
+then the kernel will not need to be reflashed.
 
 \end{document}
