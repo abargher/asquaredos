@@ -92,21 +92,26 @@ zone allocator is implemented generally, such that it is trivial to add
 additional zones.
 
 The heap allocator is handled by the kernel, but user programs are given access
-to this allocator through a set of system calls, namely \texttt{palloc()} and
-\texttt{pfree()}. All of SRAM outside of the kernel's reserved space is treated
+to this allocator through a library which accesses a set of kernel system calls,
+namely \texttt{palloc()} and \texttt{pfree()}. These calls will be used whenever
+the kernel needs to allocated memory on behalf of another process. This includes
+process sections (stack, data, etc.) and process-level heap allocations.
+
+All of SRAM outside of the kernel's reserved space is treated
 as one single shared heap. When a process is created, the kernel will use the
 heap allocator to allocate space for its stack and data segment\footnote{When
 possible, we plan to keep text segments for both the kernel and user programs in
 execute-in-place (XIP) flash memory, in order to save precious space in SRAM.}.
 When a user program wishes to dynamically allocate heap memory, it may obtain
-a block of memory on this shared heap through \texttt{palloc()}\footnote{Note
+a block of memory on this shared heap through the library call, ultimate 
+resulting in the kernel calling \texttt{palloc()}.\footnote{Note
 that the allocator is (currently) an extremely simple one. It makes no attempts
 to reduce fragmentation, and will choose the first available block on the heap
 that can fit the requested memory.}\fnsep\footnote{Security-minded readers may
 also notice that because the entire heap is shared between all processes (plus
 the kernel), there is no isolation of heap space between any processes. This is
 a downside, but because of the constraints of our embedded environment, we have
-left handling the lack of isolation between processes to the programmer.}.
+left handling the lack of isolation between processes to the programmer.}
 
 
 %% Add more miscellaneous elements here, or add more sections above this line.
