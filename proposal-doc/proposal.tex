@@ -57,7 +57,7 @@ resources (e.g., I/O).
 \subsection{Kernel layout}
 In designing \os, we prioritized reducing complexity, while also handling the
 constraints of the RP2040 platform--the largest of which is the lack of hardware
-support for virtual memory. Virtual memory in uncommon for microcontrollers, so
+support for virtual memory. Virtual memory is uncommon for microcontrollers, so
 embedded programs typically deal with hardware memory addresses directly.
 Lacking the isolation afforded by virtual memory, we chose to place the kernel
 at the top of physical memory, with fixed memory addresses for its critical
