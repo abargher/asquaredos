@@ -1,6 +1,7 @@
 #define KERNEL
 
 #include "boot.h"
+#include "utils/list.h"
 
 /* TODO use the real value from the SDK. */
 #define KB 1024
@@ -26,7 +27,7 @@ extern char __kernel_private_state_end;
  * TODO: find out if the RAM section of the .elf can be modified at runtime
  *       without breaking things, or if there's a compilation option to allow
  *       this sort of behavior.
- * 
+ *
  *       the problem is that we think by default a binary is dependent on a
  *       known fixed base address, and that's not amenable to us dynamically
  *       allocating text/data/bss.
@@ -55,7 +56,7 @@ create_system_resources(
     /*
      * Make this PCB schedulable.
      */
-    FIFO_DLL_PUSH_CIRCULAR(pcb_active, pcb, next, prev); /* TODO implement me. */
+    DLL_PUSH(ready_queue, pcb, next, prev);
 
     /*
      * TODO: Allocate sizeof(data + bss) then copy const into data (or something to that effect, todo figure this out).
@@ -93,6 +94,8 @@ main(void)
      * Initialize the zone allocator.
      */
     zinit();
+
+    /* TODO: make a "phony" kernel PCB for as the active PCB to bootstrap scheduler. */
 
     /*
      * The heap will begin aligned with the first MPU-protectable address after

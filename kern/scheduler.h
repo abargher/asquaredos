@@ -50,6 +50,12 @@ typedef struct {
 typedef struct process_control_block {
     register_t      saved_sp;       /* Saved stack pointer to recover other registers. */
     heap_region_t  *allocated;      /* List of allocated heap regions. */
+
+    /*
+     * Queue management fields.
+     */
+    struct process_control_block *next;
+    struct process_control_block *prev;
 } pcb_t;
 
 #endif /* __SCHED_H__ */
