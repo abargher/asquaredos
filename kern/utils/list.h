@@ -32,10 +32,14 @@
  * - elem:  pointer to element to be pushed onto queue.
  * - next:  name of "next" field in the queue struct.
  */
-#define SLL_PUSH(tail, elem, next)                                             \
+#define SLL_PUSH(head, tail, elem, next)                                       \
     do {                                                                       \
         (elem)->next = NULL;                                                   \
-        (tail)->next = (elem);                                                 \
+        if ((tail) == NULL) {                                                  \
+            (head) = (elem);                                                   \
+        } else {                                                               \
+            (tail)->next = (elem);                                             \
+        }                                                                      \
         (tail) = (elem);                                                       \
     } while (0)
 
@@ -78,7 +82,9 @@
     do {                                                                       \
         if ((head) == NULL) {   /* Empty queue. */                             \
             (head) = (elem);                                                   \
+            (elem)->prev = (elem);                                             \
         } else {                /* Not-empty queue. */                         \
+            (elem)->prev = (head)->prev;                                       \
             (head)->prev->next = (elem);                                       \
         }                                                                      \
         (head)->prev = elem;                                                   \
@@ -99,9 +105,17 @@
 #define DLL_INSERT(head, after, elem, next, prev)                              \
     do {                                                                       \
         if ((after) == NULL) {  /* Make the element the new head.*/            \
-            /* TODO. */                                                        \
+            (elem)->next = (head);                                             \
+            (elem)->prev = (head) ? (head)->prev : NULL;                       \
+            (head) = elem;                                                     \
+            break;                                                             \
         }                                                                      \
-        /* TODO. */                                                            \
+        if ((after) == (head)->prev) {    /* Make the element the new tail. */ \
+            (head)->prev = (elem);                                             \
+        }                                                                      \
+        (elem)->next = (after)->next;                                          \
+        (elem)->prev = (after);                                                \
+        (after)->next = (elem);                                                \
     } while (0)
 
 /*
@@ -116,11 +130,16 @@
  */
 #define DLL_REMOVE(head, elem, next, prev)                                     \
     do {                                                                       \
-        if ((head) == (elem)) {                                                \
-            (head) = NULL;                                                     \
+        if ((elem) == (head)) { /* Removing the head. */                       \
+            DLL_POP(head, elem, next, prev);                                   \
             break;                                                             \
         }                                                                      \
-        /* TODO. */                                                            \
+        if ((elem) == (head)->prev) {   /* Last elem -> update head backptr. */\
+            (head)->prev = (elem)->prev;                                       \
+        } else {    /* Not last elem -> update next's backptr. */              \
+            (elem)->next->prev = (elem)->prev;                                 \
+        }                                                                      \
+        (elem)->prev->next = (elem)->next;                                     \
     } while (0)
 
 #endif /* __LIST_H__ */
