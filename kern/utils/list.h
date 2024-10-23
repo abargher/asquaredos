@@ -9,13 +9,14 @@
 
 /*
  * Pop an element from the head of a single link list (FIFO). Sets out to NULL
- * if the queue is empty.
+ * if the list is empty.
  *
- * - head:  points to first element in the queue.
+ * - head:  points to first element in the list.
+ * - tail:  points to the last element in the list.
  * - out:   will be pointed to the popped element.
- * - next:  name of "next" field in the queue struct.
+ * - next:  name of "next" field in the list struct.
  */
-#define SLL_POP(head, out, next)                                               \
+#define SLL_POP(head, tail, out, next)                                         \
     do {                                                                       \
         if ((head) == NULL) {                                                  \
             (out) = NULL;                                                      \
@@ -23,21 +24,25 @@
         }                                                                      \
         (out) = (head);                                                        \
         (head) = (head)->next;                                                 \
+        if ((head) == NULL) {   /* We popped from a singleton; tail changed. */\
+            (tail) = NULL;                                                     \
+        }                                                                      \
     } while (0)
 
 /*
  * Push an element onto the tail of a single link list (FIFO).
  *
- * - tail:  points to the last element in the queue.
- * - elem:  pointer to element to be pushed onto queue.
- * - next:  name of "next" field in the queue struct.
+ * - head:  points to first element in the list.
+ * - tail:  points to the last element in the list.
+ * - elem:  pointer to element to be pushed onto list.
+ * - next:  name of "next" field in the list struct.
  */
 #define SLL_PUSH(head, tail, elem, next)                                       \
     do {                                                                       \
         (elem)->next = NULL;                                                   \
-        if ((tail) == NULL) {                                                  \
+        if ((tail) == NULL) {   /* Empty list. */                              \
             (head) = (elem);                                                   \
-        } else {                                                               \
+        } else {                /* Non-empty list. */                          \
             (tail)->next = (elem);                                             \
         }                                                                      \
         (tail) = (elem);                                                       \
@@ -49,18 +54,18 @@
  * and backward ("prev") pointers are circular. Thus, x->prev will never be
  * NULL.
  *
- * - head:  points to first element in the queue.
+ * - head:  points to first element in the list.
  * - out:   will be pointed to the popped element.
- * - next:  name of "next" field in the queue struct.
- * - prev:  name of "prev" field in the queue struct.
+ * - next:  name of "next" field in the list struct.
+ * - prev:  name of "prev" field in the list struct.
  */
 #define DLL_POP(head, out, next, prev)                                         \
     do {                                                                       \
         (out) = (head);                                                        \
-        if ((head) == NULL) {           /* Empty queue. */                     \
+        if ((head) == NULL) {           /* Empty list. */                      \
             break;                                                             \
         }                                                                      \
-        if ((head) == (head)->prev) {   /* Singleton queue. */                 \
+        if ((head) == (head)->prev) {   /* Singleton list. */                  \
             (head) = NULL;                                                     \
             break;                                                             \
         }                                                                      \
@@ -73,17 +78,17 @@
  * the list is empty. Note that forward ("next") pointers are non-circular, and
  * backward ("prev") pointers are circular. Thus, x->prev will never be NULL.
  *
- * - head:  points to first element in the queue.
- * - out:   will be pointed to the popped element.
+ * - head:  points to first element in the list.
+ * - elem:  points to the element to be pushed.
  * - next:  name of "next" field in the list struct.
  * - prev:  name of "prev" field in the list struct.
  */
 #define DLL_PUSH(head, elem, next, prev)                                       \
     do {                                                                       \
-        if ((head) == NULL) {   /* Empty queue. */                             \
+        if ((head) == NULL) {   /* Empty list. */                              \
             (head) = (elem);                                                   \
             (elem)->prev = (elem);                                             \
-        } else {                /* Not-empty queue. */                         \
+        } else {                /* Not-empty list. */                          \
             (elem)->prev = (head)->prev;                                       \
             (head)->prev->next = (elem);                                       \
         }                                                                      \
@@ -96,7 +101,7 @@
  * forward ("next") pointers are non-circular, and backward ("prev") pointers
  * are circular. Thus, x->prev will never be NULL.
  *
- * - head:  points to first element in the queue.
+ * - head:  points to first element in the list.
  * - after: points to the element after where "elem" should be inserted.
  * - elem:  points to the element to be inserted.
  * - next:  name of "next" field in the list struct.
@@ -106,12 +111,19 @@
     do {                                                                       \
         if ((after) == NULL) {  /* Make the element the new head.*/            \
             (elem)->next = (head);                                             \
-            (elem)->prev = (head) ? (head)->prev : NULL;                       \
+            if ((head) == NULL) {                                              \
+                (elem)->prev = (elem);                                         \
+            } else {                                                           \
+                (elem)->prev = (head)->prev;                                   \
+                (head)->prev = (elem);                                         \
+            }                                                                  \
             (head) = elem;                                                     \
             break;                                                             \
         }                                                                      \
-        if ((after) == (head)->prev) {    /* Make the element the new tail. */ \
+        if ((after)->next == NULL) {    /* Make the element the new tail. */   \
             (head)->prev = (elem);                                             \
+        } else {                                                               \
+            (after)->next->prev = (elem);                                      \
         }                                                                      \
         (elem)->next = (after)->next;                                          \
         (elem)->prev = (after);                                                \
@@ -123,7 +135,7 @@
  * ("next") pointers are non-circular, and backward ("prev") pointers are
  * circular. Thus, x->prev will never be NULL.
  *
- * - head:  points to first element in the queue.
+ * - head:  points to first element in the list.
  * - elem:  points to the element to be removed.
  * - next:  name of "next" field in the list struct.
  * - prev:  name of "prev" field in the list struct.
