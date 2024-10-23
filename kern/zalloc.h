@@ -24,6 +24,7 @@ typedef enum {
  */
 typedef struct kzone_element {
     struct kzone_element *next;     /* Next free element, if not allocated. */
+    struct kzone_element *prev;     /* Previous free element, if not allocated. */
 } kzone_elem_t;
 
 /*
