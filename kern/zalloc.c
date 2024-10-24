@@ -17,14 +17,14 @@ zalloc(kzone_id_t zone)
      * Pop an element from the free list, zero it, and return it.
      */
     kzone_elem_t *elem;
-    SLL_POP(zone_desc->free_head, elem, next);
+    DLL_POP(zone_desc->free_head, elem, next, prev);
     memset(elem, 0, zone_desc->elem_size);
 
     return (void *)elem;
 }
 
 void
-zalloc(void *elem, kzone_id_t zone)
+zfree(void *elem, kzone_id_t zone)
 {
     /*
      * Find the zone and sanity-check that this element is valid.
@@ -37,5 +37,5 @@ zalloc(void *elem, kzone_id_t zone)
     /*
      * Return the element to free list.
      */
-    SLL_PUSH(zone_desc->free_tail, (kzone_elem_t *)elem, next);
+    DLL_PUSH(zone_desc->free_tail, (kzone_elem_t *)elem, next, prev);
 }

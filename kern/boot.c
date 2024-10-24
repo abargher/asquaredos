@@ -5,11 +5,11 @@
 
 /* TODO use the real value from the SDK. */
 #define KB 1024
-#define SRAM_SIZE 256 * KB
+#define SRAM_SIZE 256 * (KB)
 #define SRAM_START 0x20000000
 
 /* TODO find good value. */
-#define STACK_SIZE 4 * KB
+#define STACK_SIZE 4 * (KB)
 
 /* Byte granularity at which the MPU can protect a region of memory. */
 #define MPU_REGION_GRANULARITY_BITS 8
@@ -50,8 +50,7 @@ create_system_resources(
     /*
      * The PCB starts with no allocated memory.
      */
-    pcb->allocated->next = NULL;
-    pcb->allocated->prev = NULL;
+    pcb->allocated = NULL;
 
     /*
      * Make this PCB schedulable.
@@ -102,12 +101,12 @@ main(void)
      * the kernel private state section ends. The heaps begins as a singleton
      * free element.
      */
-    heap_start = &__kernel_private_state_end + (MPU_REGION_GRANULARITY -
-        (uint32_t)&__kernel_private_state_end % MPU_REGION_GRANULARITY);
+    heap_start = &__kernel_private_state_end + ((MPU_REGION_GRANULARITY) -
+        (uint32_t)&__kernel_private_state_end % (MPU_REGION_GRANULARITY));
     heap_free_list = (heap_region_t *)heap_start;
     heap_free_list->next = NULL;
     heap_free_list->prev = NULL;
-    heap_free_list->size = SRAM_SIZE - (uint32_t)(&__kernel_private_state_end - SRAM_START);
+    heap_free_list->size = (SRAM_SIZE) - (uint32_t)(&__kernel_private_state_end - (SRAM_START));
 
     /* Get programs to run, and their sizes..? */
 
