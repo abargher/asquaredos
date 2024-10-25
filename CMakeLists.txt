@@ -33,9 +33,13 @@ project(asquaredos C CXX ASM)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
+set(CMAKE_CXX_FLAGS_RELEASE "-O0")
 # Add executable. Default name is the project name, version 0.1
 
+add_compile_options(-fPIC)
 add_executable(asquaredos asquaredos.c )
+
 
 pico_set_program_name(asquaredos "asquaredos")
 pico_set_program_version(asquaredos "0.1")
@@ -61,5 +65,6 @@ target_include_directories(asquaredos PRIVATE
 target_link_libraries(asquaredos 
         )
 
+pico_set_binary_type(asquaredos no_flash)
 pico_add_extra_outputs(asquaredos)
 
