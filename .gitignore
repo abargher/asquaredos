@@ -1,2 +1,7 @@
 build
 .vscode
+.DS_Store
+openocd*/
+*.bin
+*.elf
+
