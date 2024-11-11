@@ -1,2 +1,0 @@
-FLASH(rx) : ORIGIN = 0x10000000, LENGTH = ((2 * 1024 * 1024))
-/* FLASH(rx) : ORIGIN = 0x10010000, LENGTH = ((2 * 1024 * 1024) - (64 * 1024)) */
