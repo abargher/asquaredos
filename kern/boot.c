@@ -37,10 +37,12 @@ extern char __kernel_private_state_end;
 inline
 void
 create_system_resources(
-    void       *bin_start,  /* Start of the binary in FLASH. */
-    uint32_t    bin_size,   /* Size of the binary in FLASH. */
-    uint32_t    bss_size)   /* Size of uninitialized data not in .bin file. */
+    void       *load_from,  /* Start of the binary in FLASH. */
+    void       *load_to,    /* Start of the binary in SRAM. */
+    uint32_t    load_size)  /* Number of bytes to copy from flash. */
 {
+    /* TODO do we need extra space allocated for .bss (not in .bin) in SRAM? */
+
     pcb_t *pcb = (pcb_t *)zalloc(KZONE_PCB);
     assert(pcb != NULL);
 
@@ -50,34 +52,34 @@ create_system_resources(
     pcb->allocated = NULL;
 
     /*
-     * Make this PCB schedulable.
-     */
-    DLL_PUSH(ready_queue, pcb, next, prev);
-
-    /*
      * Allocate a stack.
      */
-    void *stack = palloc(STACK_SIZE, pcb);
+    void *stack = palloc(STACK_SIZE, pcb, PALLOC_FLAGS_ANYWHERE, NULL);
     assert(stack != NULL);
     pcb->saved_sp = (uint32_t)stack + STACK_SIZE;   /* Start at TOP of the stack. */
 
     /*
      * Allocate space for the program's execution state ("binary") in memory.
      */
-    void *bin = palloc(bin_size + bss_size, pcb);
-    assert(bin != NULL);
-    memcpy(bin, bin_start, bin_size);
+    void *out = palloc(load_size, pcb, PALLOC_FLAGS_FIXED, load_to);
+    assert(out == load_to);
+    memcpy(load_to, load_from, load_size);
 
     /*
      * Resume execution at the beginning of the binary.
      */
     stack_registers_t *stack_registers = (stack_registers_t *)stack;
-    stack_registers->lr = bin;
+    stack_registers->lr = load_to;
 
     /*
      * Align stack pointer correctly pop our initial saved registers.
      */
     pcb->saved_sp -= sizeof(stack_registers_t);
+
+    /*
+     * Make this PCB schedulable.
+     */
+    DLL_PUSH(ready_queue, pcb, next, prev);
 
     /*
      * At this point this process should be ready-to-run when the scheduler
