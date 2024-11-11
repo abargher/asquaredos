@@ -3,4 +3,6 @@
 
 #include "scheduler.h"
 
+extern void schedule_handler(void);
+
 #endif /* __CONTEXT_SWITCH_H__ */

@@ -2,6 +2,8 @@
 #include <string.h>
 #include "pico/stdlib.h"
 
+#include "kern/context_switch.h"
+
 #define RAM_ADDR (SRAM_BASE + (64 * 1024))
 #define FLASH_ADDR (XIP_BASE + (64 * 1024))
 
