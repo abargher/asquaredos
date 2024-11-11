@@ -1,7 +1,9 @@
 #define KERNEL
 
+#include <string.h>
 #include "boot.h"
 #include "utils/list.h"
+#include "utils/panic.h"
 
 /* TODO use the real value from the SDK. */
 #define KB 1024
@@ -35,14 +37,9 @@ extern char __kernel_private_state_end;
 inline
 void
 create_system_resources(
-    uint32_t text_size,
-    uint32_t data_size,
-    uint32_t bss_size,
-    uint32_t got_size,
-    void *flash_elf_text_section,
-    void *flash_elf_const_section,
-    void *flash_elf_bss_section,
-    void *flash_elf_got_section)
+    void       *bin_start,  /* Start of the binary in FLASH. */
+    uint32_t    bin_size,   /* Size of the binary in FLASH. */
+    uint32_t    bss_size)   /* Size of uninitialized data not in .bin file. */
 {
     pcb_t *pcb = (pcb_t *)zalloc(KZONE_PCB);
     assert(pcb != NULL);
@@ -58,23 +55,29 @@ create_system_resources(
     DLL_PUSH(ready_queue, pcb, next, prev);
 
     /*
-     * TODO: Allocate sizeof(data + bss) then copy const into data (or something to that effect, todo figure this out).
+     * Allocate a stack.
      */
-
+    void *stack = palloc(STACK_SIZE, pcb);
+    assert(stack != NULL);
+    pcb->saved_sp = (uint32_t)stack + STACK_SIZE;   /* Start at TOP of the stack. */
 
     /*
-     * Initialize special-purpose registers.
-     *
-     * TODO: one of us needs to come through and find the right initial values
-     *       based on what the datasheet says.
+     * Allocate space for the program's execution state ("binary") in memory.
      */
-    pcb->registers.sp = palloc(STACK_SIZE, pcb);
-    assert(pcb->registers.sp);      /* TODO implement assert that panics if false. */
-    pcb->registers.pc = flash_elf_text_section;
-    pcb->registers.control = CONTROL_UNPRIVILEGED;  /* TODO get from SDK. */
-    pcb->registers.primask = PRIORITY_MASK_DEFAULT; /* TODO decide on a default. */
-    pcb->registers.psr = 0;                         /* TODO deicde on initial value. */
-    pcb->registers.lr = 0;                          /* TODO decide on initial value. */
+    void *bin = palloc(bin_size + bss_size, pcb);
+    assert(bin != NULL);
+    memcpy(bin, bin_start, bin_size);
+
+    /*
+     * Resume execution at the beginning of the binary.
+     */
+    stack_registers_t *stack_registers = (stack_registers_t *)stack;
+    stack_registers->lr = bin;
+
+    /*
+     * Align stack pointer correctly pop our initial saved registers.
+     */
+    pcb->saved_sp -= sizeof(stack_registers_t);
 
     /*
      * At this point this process should be ready-to-run when the scheduler
