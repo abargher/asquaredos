@@ -6,6 +6,6 @@ picotool load -n -o 0x10010000 asquaredos.bin
 sudo openocd -f interface/cmsis-dap.cfg -f target/rp2040.cfg -c "adapter speed 5000" -c "program asquaredos.elf verify reset exit"
 
 # open debugger
-arm-eabi-none-gdb build/asquaredos.elf
+arm-none-eabi-gdb build/asquaredos.elf
 
 
