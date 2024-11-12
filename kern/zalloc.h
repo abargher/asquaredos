@@ -41,7 +41,7 @@ typedef struct {
 /*
  * State tracking for all allocator zones.
  */
-kzone_desc_t zone_table[N_KZONES] __attribute__((section("kernel_private_state")));
+extern kzone_desc_t zone_table[N_KZONES]; //__attribute__((section("kernel_private_state")));
 
 /*
  * Initialize the zone allocator.

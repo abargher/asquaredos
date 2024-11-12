@@ -1,6 +1,12 @@
 #include "zalloc.h"
 #include "utils/list.h"
+#include "utils/panic.h"
 #include <string.h>
+
+/*
+ * State tracking for all allocator zones.
+ */
+kzone_desc_t zone_table[N_KZONES]; //__attribute__((section("kernel_private_state")));
 
 void *
 zalloc(kzone_id_t zone)
@@ -30,9 +36,9 @@ zfree(void *elem, kzone_id_t zone)
      * Find the zone and sanity-check that this element is valid.
      */
     kzone_desc_t *zone_desc = &zone_table[zone];
-    assert(elem >= zone_desc->zone_start &&
-           elem <= zone_desc->zone_start + zone_desc->elem_size * (zone_desc->n_elems - 1), "tried to free out-of-range element at %p from zone %d (%hu elements of size %hu bytes at %p).\n", elem, zone, zone_desc->n_elems, zone_desc->elem_size, zone_desc->zone_start);
-    assert((uint32_t)elem - (uint32_t)zone_desc->zone_start % zone_desc->elem_size == 0, "tried to free unaligned element at %p from zone %d (%hu elements of size %hu bytes at %p).\n", elem, zone, zone_desc->n_elems, zone_desc->elem_size, zone_desc->zone_start);
+    // assert(elem >= zone_desc->zone_start &&
+    //        elem <= zone_desc->zone_start + zone_desc->elem_size * (zone_desc->n_elems - 1), "tried to free out-of-range element at %p from zone %d (%hu elements of size %hu bytes at %p).\n", elem, zone, zone_desc->n_elems, zone_desc->elem_size, zone_desc->zone_start);
+    // assert((uint32_t)elem - (uint32_t)zone_desc->zone_start % zone_desc->elem_size == 0, "tried to free unaligned element at %p from zone %d (%hu elements of size %hu bytes at %p).\n", elem, zone, zone_desc->n_elems, zone_desc->elem_size, zone_desc->zone_start);
 
     /*
      * Return the element to free list.

@@ -4,6 +4,8 @@
 #include "boot.h"
 #include "utils/list.h"
 #include "utils/panic.h"
+#include "palloc.h"
+#include "zalloc.h"
 
 /* TODO use the real value from the SDK. */
 #define KB 1024
@@ -32,7 +34,7 @@ extern char __data_end__;
  *       known fixed base address, and that's not amenable to us dynamically
  *       allocating text/data/bss.
  */
-inline
+// inline
 void
 create_system_resources(
     void       *load_from,  /* Start of the binary in FLASH. */
@@ -112,5 +114,7 @@ main(void)
     heap_free_list->size = (SRAM_SIZE) - (uint32_t)(&__data_end__ - (SRAM_START));
 
     /* Get programs to run, and their sizes..? */
+
+    create_system_resources((void *)0x10010000, (void *)0x20010000, (64 * 1024));
 
 }

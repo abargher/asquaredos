@@ -37,7 +37,16 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall")
 set(CMAKE_CXX_FLAGS_RELEASE "-O0")
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(asquaredos kern/boot.c kern/context_switch.s)
+add_executable(asquaredos 
+    kern/boot.c
+    kern/palloc.c
+    kern/zalloc.c
+    kern/resources.c
+
+    kern/scheduler.c
+
+    kern/context_switch.s
+)
 
 pico_set_program_name(asquaredos "asquaredos")
 pico_set_program_version(asquaredos "0.1")

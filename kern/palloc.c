@@ -2,6 +2,9 @@
 #include <stdint.h>
 
 #include "utils/list.h"
+#include "utils/panic.h"
+#include "resources.h"
+#include <stddef.h>
 
 /*
  * Find and delink any block containing size bytes at any address.
@@ -38,8 +41,8 @@ palloc_find_fixed(
         /*
          * Check that the current block contains the entire requested region.
          */
-        if (cur->data <= address &&
-            cur->data + cur->size >= (uint32_t)address + size) {
+        if (cur->data <= (uint8_t*)address &&
+            cur->data + cur->size >= (uint8_t*)address + size) {
             DLL_REMOVE(heap_free_list, out, next, prev);
             break;
         }
