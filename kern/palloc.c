@@ -14,9 +14,8 @@ palloc_find_anywhere(uint32_t size)
 {
     heap_region_t *out = NULL;
 
-    heap_region_t *cur;
-    for (cur = heap_free_list; cur; cur = cur->next) {
-        if (cur->size >= size) {
+    for (out = heap_free_list; out; out = out->next) {
+        if (out->size >= size) {
             DLL_REMOVE(heap_free_list, out, next, prev);
             break;
         }
@@ -35,12 +34,12 @@ palloc_find_fixed(
     void       *address)
 {
     heap_region_t *out = NULL;
-    for (out = heap_free_list; out; out = cur->next) {
+    for (out = heap_free_list; out; out = out->next) {
         /*
          * Check that the current block contains the entire requested region.
          */
-        if (cur->data <= (uint8_t*)address &&
-            cur->data + cur->size >= (uint8_t*)address + size) {
+        if (out->data <= (uint8_t*)address &&
+            out->data + out->size >= (uint8_t*)address + size) {
             DLL_REMOVE(heap_free_list, out, next, prev);
             break;
         }
