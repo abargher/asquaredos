@@ -35,9 +35,7 @@ palloc_find_fixed(
     void       *address)
 {
     heap_region_t *out = NULL;
-
-    heap_region_t *cur;
-    for (cur = heap_free_list; cur; cur = cur->next) {
+    for (out = heap_free_list; out; out = cur->next) {
         /*
          * Check that the current block contains the entire requested region.
          */
