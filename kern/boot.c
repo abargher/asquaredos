@@ -97,7 +97,7 @@ main(void)
     /*
      * Initialize the zone allocator.
      */
-    zinit();
+    // zinit();
 
     /* TODO: make a "phony" kernel PCB for as the active PCB to bootstrap scheduler. */
 

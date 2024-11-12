@@ -1,5 +1,6 @@
 /*
- * context_switch.asm:
+    ldmia   psp!, {r0-r3, pc}       @ Load r0-r3 and and the lr (into the PC) for the to-be-scheduled process
+ * context_switch.s:
  *
  * Implements context switching between processes.
  * 
@@ -9,11 +10,11 @@
  *      https://archive.fosdem.org/2018/schedule/event/multitasking_on_cortexm/attachments/slides/2602/export/events/attachments/multitasking_on_cortexm/slides/2602/Slides.pdf
  */
 
-.globl schedule_handler
-
+.global schedule_handler
+.thumb_func
 schedule_handler:
-
-    stmdb   psp!, {r0-r3, lr}       @ Save r0-r3, and lr (the saved PC) to the to-be-descheduled process
+    @ stmdb   psp!, {r0-r3, lr}       @ Save r0-r3, and lr (the saved PC) to the to-be-descheduled process
+    push    {r3, lr}                @ Save r0-r3, and lr (the saved PC) to the to-be-descheduled process
     bl      sched_get_next          @ Get the next process to load -- TODO define me
     ldr     r3, =pcb_active         @ Get the current process
     ldr     r1, [r3]                @ Dereference pcb_active
@@ -21,7 +22,8 @@ schedule_handler:
     beq     schedule_handler_return @ If we're scheduling the active process then this is a no-op
     bl      context_switch
 schedule_handler_return:
-    ldmia   psp!, {r0-r3, pc}       @ Load r0-r3 and and the lr (into the PC) for the to-be-scheduled process
+    @ ldmia   psp!, {r0-r3, pc}       @ Load r0-r3 and and the lr (into the PC) for the to-be-scheduled process
+    pop     {r3, pc}                 @ Load r0-r3 and and the lr (into the PC) for the to-be-scheduled process
 
 context_switch:
     mrs     r2, psp         @ Write the to-be-descheduled programs's SP into r2
