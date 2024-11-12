@@ -6,6 +6,7 @@
 #include "utils/panic.h"
 #include "palloc.h"
 #include "zalloc.h"
+#include "context_switch.h"
 
 /* TODO use the real value from the SDK. */
 #define KB 1024
@@ -116,5 +117,6 @@ main(void)
     /* Get programs to run, and their sizes..? */
 
     create_system_resources((void *)0x10010000, (void *)0x20010000, (64 * 1024));
-
+    create_system_resources((void *)0x10020000, (void *)0x20020000, (64 * 1024));
+    schedule_handler();
 }
