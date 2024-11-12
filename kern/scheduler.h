@@ -37,7 +37,7 @@ typedef struct heap_region {
  * The saved stack pointer will be located in the process's PCB.
  */
 __attribute__((packed))
-typedef struct {
+struct stack_registers {
     /*
      * Saved by initial "ldmia" instruction.
      */
@@ -62,7 +62,8 @@ typedef struct {
     register_t r10;
     register_t r9;
     register_t r8;
-} stack_registers_t;
+};
+typedef struct stack_registers stack_registers_t;
 
 /*
  * Process control block containing the data and references required to manage

@@ -7,7 +7,6 @@
 #ifndef __LIST_H__
 #define __LIST_H__
 
-#define NULL (void *)0
 
 /*
  * Pop an element from the head of a single link list (FIFO). Sets out to NULL

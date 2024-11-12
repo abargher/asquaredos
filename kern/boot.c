@@ -17,13 +17,11 @@
 #define MPU_REGION_GRANULARITY_BITS 8
 #define MPU_REGION_GRANULARITY 1 << (MPU_REGION_GRANULARITY_BITS)
 
-#define NULL (void *)0
-
 /*
  * Layout of our private kernel state, defined by the linker script.
  */
-extern char __kernel_private_state_start;
-extern char __kernel_private_state_end;
+extern char __data_start__;
+extern char __data_end__;
 
 /*
  * TODO: find out if the RAM section of the .elf can be modified at runtime
@@ -69,7 +67,7 @@ create_system_resources(
      * Resume execution at the beginning of the binary.
      */
     stack_registers_t *stack_registers = (stack_registers_t *)stack;
-    stack_registers->lr = load_to;
+    stack_registers->lr = (register_t)load_to;
 
     /*
      * Align stack pointer correctly pop our initial saved registers.
@@ -90,7 +88,7 @@ create_system_resources(
 /*
  * Third stage bootloader.
  */
-__attribute__((noreturn))
+// __attribute__((noreturn))
 int
 main(void)
 {
@@ -106,12 +104,12 @@ main(void)
      * the kernel private state section ends. The heaps begins as a singleton
      * free element.
      */
-    heap_start = &__kernel_private_state_end + ((MPU_REGION_GRANULARITY) -
-        (uint32_t)&__kernel_private_state_end % (MPU_REGION_GRANULARITY));
+    heap_start = &__data_end__ + ((MPU_REGION_GRANULARITY) -
+        (uint32_t)&__data_end__ % (MPU_REGION_GRANULARITY));
     heap_free_list = (heap_region_t *)heap_start;
     heap_free_list->next = NULL;
     heap_free_list->prev = NULL;
-    heap_free_list->size = (SRAM_SIZE) - (uint32_t)(&__kernel_private_state_end - (SRAM_START));
+    heap_free_list->size = (SRAM_SIZE) - (uint32_t)(&__data_end__ - (SRAM_START));
 
     /* Get programs to run, and their sizes..? */
 
