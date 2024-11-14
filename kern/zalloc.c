@@ -17,11 +17,19 @@ pcb_t zone_pcbs[PCB_ZONE_ELEMS];
 
 
 /*
- * Takes an otherwise initialized kzone_desc_t and sets up the free list.
+ * Initializes an individual zone.
  */
 static void
-initialize_zone_free_list(kzone_desc_t *desc)
+initialize_zone(
+    kzone_id_t  id,
+    uint16_t    n_elems,
+    uint16_t    elem_size,
+    void       *start)
 {
+    kzone_desc_t *desc = &zone_table[id];
+    desc->n_elems = n_elems;
+    desc->elem_size = elem_size;
+    desc->zone_start = (kzone_elem_t *)start;
     for (int i = 0; i < desc->n_elems; i++) {
         kzone_elem_t *elem = (kzone_elem_t *)(desc->zone_start + i * desc->elem_size);
         SLL_PUSH(desc->free_head, desc->free_tail, elem, next, prev);
@@ -37,15 +45,7 @@ zinit(void)
 {
     kzone_desc_t *desc;
 
-    /*
-     * Register the PCB zone.
-     */
-    desc = &zone_table[KZONE_PCB];
-    desc->n_elems = PCB_ZONE_ELEMS;
-    desc->elem_size = sizeof(pcb_t);
-    desc->zone_start = (kzone_elem_t *)zone_pcbs;
-    initialize_zone_free_list(desc);
-
+    initialize_zone(KZONE_PCB, PCB_ZONE_ELEMS, sizeof(pcb_t), zone_pcbs);
     /*
      * Register the next zone here.
      */

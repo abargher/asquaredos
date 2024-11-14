@@ -43,7 +43,7 @@ typedef struct {
 extern kzone_desc_t zone_table[N_KZONES]; //__attribute__((section("kernel_private_state")));
 
 /*
- * Initialize the zone allocator.
+ * Initializes all zones for the zone allocator.
  */
 void
 zinit(void);
