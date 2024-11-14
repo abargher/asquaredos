@@ -32,7 +32,7 @@ initialize_zone(
     desc->zone_start = (kzone_elem_t *)start;
     for (int i = 0; i < desc->n_elems; i++) {
         kzone_elem_t *elem = (kzone_elem_t *)(desc->zone_start + i * desc->elem_size);
-        SLL_PUSH(desc->free_head, desc->free_tail, elem, next, prev);
+        SLL_PUSH(desc->free_head, desc->free_tail, elem, next);
     }
 }
 
@@ -66,7 +66,7 @@ zalloc(kzone_id_t zone)
      * Pop an element from the free list, zero it, and return it.
      */
     kzone_elem_t *elem;
-    SLL_POP(zone_desc->free_head, zone_desc->free_tail, elem, next, prev);
+    SLL_POP(zone_desc->free_head, zone_desc->free_tail, elem, next);
     memset(elem, 0, zone_desc->elem_size);
 
     return (void *)elem;
@@ -88,5 +88,5 @@ zfree(
     /*
      * Return the element to free list.
      */
-    SLL_PUSH(zone_desc->free_head, zone_desc->free_tail, (kzone_elem_t *)elem, next, prev);
+    SLL_PUSH(zone_desc->free_head, zone_desc->free_tail, (kzone_elem_t *)elem, next);
 }
