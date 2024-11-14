@@ -53,18 +53,18 @@ create_system_resources(
     pcb->allocated = NULL;
 
     /*
-     * Allocate space for the program's execution state ("binary") in memory.
-     */
-    void *out = palloc(load_size, pcb, PALLOC_FLAGS_FIXED, load_to);
-    assert(out == load_to);
-    memcpy(load_to, load_from, load_size);
-
-    /*
      * Allocate a stack.
      */
     void *stack = palloc(STACK_SIZE, pcb, PALLOC_FLAGS_ANYWHERE, NULL);
     assert(stack != NULL);
     pcb->saved_sp = (uint32_t)stack + STACK_SIZE;   /* Start at TOP of the stack. */
+
+    /*
+     * Allocate space for the program's execution state ("binary") in memory.
+     */
+    void *out = palloc(load_size, pcb, PALLOC_FLAGS_FIXED, load_to);
+    assert(out == load_to);
+    memcpy(load_to, load_from, load_size);
 
     /*
      * Resume execution at the beginning of the binary.
