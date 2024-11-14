@@ -1,6 +1,7 @@
 #define KERNEL
 
 #include <string.h>
+#include <stdio.h>
 #include "boot.h"
 #include "utils/list.h"
 #include "utils/panic.h"
@@ -26,7 +27,7 @@
  * Layout of our private kernel state, defined by the linker script.
  */
 extern char __data_start__;
-extern char __data_end__;
+extern char __bss_end__;
 
 /*
  * TODO: find out if the RAM section of the .elf can be modified at runtime
@@ -69,15 +70,30 @@ create_system_resources(
     memcpy(load_to, load_from, load_size);
 
     /*
-     * Resume execution at the beginning of the binary.
-     */
-    stack_registers_t *stack_registers = (stack_registers_t *)stack;
-    stack_registers->lr = (register_t)load_to;
-
-    /*
      * Align stack pointer correctly pop our initial saved registers.
      */
     pcb->saved_sp -= sizeof(stack_registers_t);
+    // printf("stack pointer is: %p\n", pcb->saved_sp);
+
+    for (int i = 0; i < 128; i++) {
+        *((char *)pcb->saved_sp - i) = i;
+    }
+    
+    /*
+     * Resume execution at the beginning of the binary.
+     */
+    memset((void *)pcb->saved_sp, 0xab, sizeof(stack_registers_t));
+
+    stack_registers_t *stack_registers = (stack_registers_t *)pcb->saved_sp;
+    stack_registers->lr = (register_t)load_to;
+    stack_registers->r0 = (register_t)0;
+    stack_registers->r1 = (register_t)(~0);
+    stack_registers->r3 = (register_t)(0x33333333);
+    stack_registers->r8 = (register_t)(0x88888888);
+    stack_registers->r5 = (register_t)(0x55555555);
+
+    // printf("hello there\n");
+    // printf("stack_reg->lr is: %p\n", &(stack_registers->lr));
 
     /*
      * Make this PCB schedulable.
@@ -97,6 +113,7 @@ create_system_resources(
 int
 main(void)
 {
+    stdio_init_all();
     /*
      * Initialize the zone allocator.
      */
@@ -109,12 +126,12 @@ main(void)
      * the kernel private state section ends. The heaps begins as a singleton
      * free element.
      */
-    heap_start = &__data_end__ + ((MPU_REGION_GRANULARITY) -
-        (uint32_t)&__data_end__ % (MPU_REGION_GRANULARITY));
+    heap_start = &__bss_end__ + ((MPU_REGION_GRANULARITY) -
+        (uint32_t)&__bss_end__ % (MPU_REGION_GRANULARITY));
     heap_free_list = (heap_region_t *)heap_start;
     heap_free_list->next = NULL;
     heap_free_list->prev = NULL;
-    heap_free_list->size = (SRAM_SIZE) - (uint32_t)(&__data_end__ - (SRAM_START));
+    heap_free_list->size = (SRAM_SIZE) - (uint32_t)(&__bss_end__ - (SRAM_START));
 
     /* Get programs to run, and their sizes..? */
 

@@ -43,8 +43,8 @@ context_switch:
     /* Save to-be-descheduled SP and load to-be-scheduled SP */
     mov     r2, sp          @ Save the to-be-descheduled program's now-updated SP into r2
     mov     sp, r3          @ Load the kernel's stack pointer from r3 (where we left it)
-    str     r2, [r0]        @ Store the to-be-descheduled program's SP into *r0 from r2, i.e., the "saved SP" field in its PCB
-    ldr     r2, [r1]        @ Load the to-be-scheduled program's SP from *r1 into r2, i.e., the "saved SP" field of the to-be-scheduled PCB
+    str     r2, [r1]        @ Store the to-be-descheduled program's SP into *r0 from r2, i.e., the "saved SP" field in its PCB
+    ldr     r2, [r0]        @ Load the to-be-scheduled program's SP from *r1 into r2, i.e., the "saved SP" field of the to-be-scheduled PCB
 
     /* Restore r8-r11 */
     ldmia   r2!, {r4-r7}    @ Using r2 (the saved SP of the to-be-scheduled program), load the saved values of r8-r11 into r4-r7 (inverse of save procedure)
