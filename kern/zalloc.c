@@ -1,4 +1,5 @@
 #include "zalloc.h"
+#include "scheduler.h"
 #include "utils/list.h"
 #include "utils/panic.h"
 #include <string.h>
@@ -7,6 +8,48 @@
  * State tracking for all allocator zones.
  */
 kzone_desc_t zone_table[N_KZONES]; //__attribute__((section("kernel_private_state")));
+
+/*
+ * Create each zone.
+ */
+#define PCB_ZONE_ELEMS 32
+pcb_t zone_pcbs[PCB_ZONE_ELEMS];
+
+
+/*
+ * Takes an otherwise initialized kzone_desc_t and sets up the free list.
+ */
+static void
+initialize_zone_free_list(kzone_desc_t *desc)
+{
+    for (int i = 0; i < desc->n_elems; i++) {
+        kzone_elem_t *elem = (kzone_elem_t *)(desc->zone_start + i * desc->elem_size);
+        SLL_PUSH(desc->free_head, desc->free_tail, elem, next, prev);
+    }
+}
+
+/*
+ * Each zone needs an initialization call here. Adding any new zones
+ * necesitates this registration so that the zone can be properly accessed.
+ */
+void
+zinit(void)
+{
+    kzone_desc_t *desc;
+
+    /*
+     * Register the PCB zone.
+     */
+    desc = &zone_table[KZONE_PCB];
+    desc->n_elems = PCB_ZONE_ELEMS;
+    desc->elem_size = sizeof(pcb_t);
+    desc->zone_start = (kzone_elem_t *)zone_pcbs;
+    initialize_zone_free_list(desc);
+
+    /*
+     * Register the next zone here.
+     */
+}
 
 void *
 zalloc(kzone_id_t zone)
@@ -23,14 +66,16 @@ zalloc(kzone_id_t zone)
      * Pop an element from the free list, zero it, and return it.
      */
     kzone_elem_t *elem;
-    DLL_POP(zone_desc->free_head, elem, next, prev);
+    SLL_POP(zone_desc->free_head, zone_desc->free_tail, elem, next, prev);
     memset(elem, 0, zone_desc->elem_size);
 
     return (void *)elem;
 }
 
 void
-zfree(void *elem, kzone_id_t zone)
+zfree(
+    void *elem,
+    kzone_id_t zone)
 {
     /*
      * Find the zone and sanity-check that this element is valid.
@@ -43,5 +88,5 @@ zfree(void *elem, kzone_id_t zone)
     /*
      * Return the element to free list.
      */
-    DLL_PUSH(zone_desc->free_tail, (kzone_elem_t *)elem, next, prev);
+    SLL_PUSH(zone_desc->free_head, zone_desc->free_tail, (kzone_elem_t *)elem, next, prev);
 }

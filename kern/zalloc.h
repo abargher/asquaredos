@@ -24,7 +24,6 @@ typedef enum {
  */
 typedef struct kzone_element {
     struct kzone_element *next;     /* Next free element, if not allocated. */
-    struct kzone_element *prev;     /* Previous free element, if not allocated. */
 } kzone_elem_t;
 
 /*
@@ -33,7 +32,7 @@ typedef struct kzone_element {
 typedef struct {
     uint16_t        n_elems;        /* Number of elements in this zone. */
     uint16_t        elem_size;      /* sizeof(type). */
-    kzone_elem_t   *zone_start;     /* First element in the zone. */
+    void           *zone_start;     /* First byte in the zone. */
     kzone_elem_t   *free_head;      /* First element in the free list (to pop). */
     kzone_elem_t   *free_tail;      /* Last element in the free list (to push). */
 } kzone_desc_t;
