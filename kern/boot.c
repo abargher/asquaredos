@@ -7,6 +7,8 @@
 #include "palloc.h"
 #include "zalloc.h"
 #include "context_switch.h"
+#include "pico/stdlib.h"
+#include "hardware/exception.h"
 
 /* TODO use the real value from the SDK. */
 #define KB 1024
@@ -118,5 +120,13 @@ main(void)
 
     create_system_resources((void *)0x10010000, (void *)0x20010000, (64 * 1024));
     create_system_resources((void *)0x10020000, (void *)0x20020000, (64 * 1024));
-    schedule_handler();
+
+    exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
+    asm("mrs r0, msp");
+    asm("msr psp, r0");
+    asm("svc #0");
+
+    // p/x *(stack_registers_t * )($r2 - sizeof(stack_registers_t))
+    // 
+    // schedule_handler();
 }
