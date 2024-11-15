@@ -1,7 +1,7 @@
 #define KERNEL
 
 #include <string.h>
-// #include <stdio.h>
+#include <stdio.h>
 #include "boot.h"
 #include "utils/list.h"
 #include "utils/panic.h"
@@ -59,15 +59,19 @@ create_system_resources(
      * Allocate a stack.
      */
     void *stack = palloc(STACK_SIZE, pcb, PALLOC_FLAGS_ANYWHERE, NULL);
+    printf("stack: %p - %p\n", stack, stack+STACK_SIZE);
     assert(stack != NULL);
     pcb->saved_sp = (uint32_t)stack + STACK_SIZE;   /* Start at TOP of the stack. */
 
     /*
      * Allocate space for the program's execution state ("binary") in memory.
      */
-    void *out = palloc(load_size, pcb, PALLOC_FLAGS_FIXED, load_to);
-    assert(out == load_to);
-    memcpy(load_to, load_from, load_size);
+    if (load_to == (void *)0x20020000) {
+        void *out = palloc(load_size, pcb, PALLOC_FLAGS_FIXED, load_to);
+        printf("bin: %p - %p\n", out, out+load_size);
+        assert(out == load_to);
+        memcpy(load_to, load_from, load_size);
+    }
 
     /*
      * Align stack pointer correctly pop our initial saved registers.
@@ -101,7 +105,8 @@ create_system_resources(
 int
 main(void)
 {
-    // stdio_init_all();
+    stdio_init_all();
+    sleep_ms(5000);
     /*
      * Initialize the zone allocator.
      */
@@ -125,7 +130,7 @@ main(void)
 
 
     create_system_resources((void *)0x10020000, (void *)0x20020000, (64 * 1024));
-    // create_system_resources((void *)0x10010000, (void *)0x20010000, (64 * 1024));
+    create_system_resources((void *)0x10010000, (void *)0x20010000, (64 * 1024));
 
     exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
 
