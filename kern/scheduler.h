@@ -41,27 +41,27 @@ struct stack_registers {
     /*
      * Saved by initial "ldmia" instruction.
      */
-    register_t lr;  /* Link register. Will be loaded into PC. */
-    register_t r3;
-    register_t r2;
-    register_t r1;
-    register_t r0;
+    register_t r8;
+    register_t r9;
+    register_t r10;
+    register_t r11;
     
     /*
      * Saved by the first "push" instruction.
      */
-    register_t r7;
-    register_t r6;
-    register_t r5;
     register_t r4;
+    register_t r5;
+    register_t r6;
+    register_t r7;
 
     /*
      * Saved by the second "push" instruction.
      */
-    register_t r11;
-    register_t r10;
-    register_t r9;
-    register_t r8;
+    register_t r0;
+    register_t r1;
+    register_t r2;
+    register_t r3;
+    register_t lr;
 };
 typedef struct stack_registers stack_registers_t;
 

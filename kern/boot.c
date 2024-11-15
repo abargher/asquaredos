@@ -143,7 +143,7 @@ main(void)
     asm("msr psp, r0");
     asm("svc #0");
 
-    // p/x *(stack_registers_t * )($r2 - sizeof(stack_registers_t))
+    // p/x *(stack_registers_t * )($r2)
     // 
     // schedule_handler();
 }
