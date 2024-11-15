@@ -104,7 +104,7 @@
  * are circular. Thus, x->prev will never be NULL.
  *
  * - head:  points to first element in the list.
- * - after: points to the element after where "elem" should be inserted.
+ * - after: points to the element where "elem" should be inserted after.
  * - elem:  points to the element to be inserted.
  * - next:  name of "next" field in the list struct.
  * - prev:  name of "prev" field in the list struct.
