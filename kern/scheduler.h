@@ -57,10 +57,7 @@ struct stack_registers {
     /*
      * Saved by the second "push" instruction.
      */
-    register_t r0;
-    register_t r1;
-    register_t r2;
-    register_t r3;
+    register_t padding; /* NOT A REAL VALUE*/
     register_t lr;
 };
 typedef struct stack_registers stack_registers_t;

@@ -58,4 +58,5 @@ context_switch:
 
     /* Load the to-be-scheduled SP into PSP and return to end of handler (to set saved PC) */
     msr     psp, r2         @ Save r2 (to-be-scheduled SP) as PSP
+    mov     sp, r2          @ TODO: revisit this, is it fully correct? (sets MSP = PSP)
     bx      lr              @ return to schedule_handler_return
