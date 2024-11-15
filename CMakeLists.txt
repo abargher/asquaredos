@@ -39,6 +39,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O0")
 
 add_executable(asquaredos 
     kern/boot.c
+    # asquaredos.c
     kern/palloc.c
     kern/zalloc.c
     kern/resources.c

@@ -73,22 +73,16 @@ create_system_resources(
      * Align stack pointer correctly pop our initial saved registers.
      */
     pcb->saved_sp -= sizeof(stack_registers_t);
-    
-    for (int i = 0; i < 128; i++) {
-        *((char *)pcb->saved_sp - i) = i;
-    }
-    
+
     /*
      * Resume execution at the beginning of the binary.
      */
-    
-    memset((void *)pcb->saved_sp, 0xab, sizeof(stack_registers_t));
 
     stack_registers_t *stack_registers = (stack_registers_t *)pcb->saved_sp;
     stack_registers->lr = (register_t)load_to | 1;
     stack_registers->r8 = (register_t)(0x88888888);
     stack_registers->r5 = (register_t)(0x55555555);
-    
+
     /*
      * Make this PCB schedulable.
      */
@@ -108,7 +102,6 @@ int
 main(void)
 {
     // stdio_init_all();
-    sleep_ms(5000);
     /*
      * Initialize the zone allocator.
      */
@@ -130,17 +123,17 @@ main(void)
 
     /* Get programs to run, and their sizes..? */
 
-    
+
     create_system_resources((void *)0x10020000, (void *)0x20020000, (64 * 1024));
-    create_system_resources((void *)0x10010000, (void *)0x20010000, (64 * 1024));
+    // create_system_resources((void *)0x10010000, (void *)0x20010000, (64 * 1024));
 
     exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
-    
+
     asm("mrs r0, msp");
     asm("msr psp, r0");
     asm("svc #0");
 
     // p/x *(stack_registers_t * )($r2)
-    // 
+    //
     // schedule_handler();
 }

@@ -16,11 +16,11 @@ int main() {
   while (1) {
     gpio_put(25, 1);  // Set pin 25 to high
     // sleep_ms(delay);  // 1.0s delay
-    for (volatile int i = 0; i < 1000000; i++);
+    for (volatile int i = 0; i < 10000000; i++);
 
     gpio_put(25, 0);  // Set pin 25 to low
     // sleep_ms(delay);  // 1.0s delay
-    for (volatile int i = 0; i < 1000000; i++);
+    for (volatile int i = 0; i < 10000000; i++);
   }
 }
 
