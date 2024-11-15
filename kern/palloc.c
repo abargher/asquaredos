@@ -1,5 +1,6 @@
 #include "palloc.h"
 #include <stdint.h>
+#include <stdio.h>
 
 #include "utils/list.h"
 #include "utils/panic.h"
@@ -69,7 +70,10 @@ palloc_find_fixed(
         /*
          * Free the trimmed head.
          */
+
         start->size = (uint32_t)(address - (void *)&start->data);
+        start->prev = NULL;
+
         DLL_INSERT(heap_free_list, start->prev, start, next, prev);
 
         out->size -= start->size;
@@ -103,7 +107,7 @@ palloc(
     if (out && out->size >= size + sizeof(heap_region_t)) {
         heap_region_t *leftover = (heap_region_t *)((void *)out + size);
         leftover->size = out->size - size;
-        DLL_INSERT(heap_free_list, out->prev, out + size, next, prev);
+        DLL_INSERT(heap_free_list, out->prev, (heap_region_t *)((void *)out->data + size), next, prev);
     }
 
     return out->data;

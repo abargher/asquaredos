@@ -39,7 +39,7 @@ typedef struct heap_region {
 __attribute__((packed))
 struct stack_registers {
     /*
-     * Saved by initial "ldmia" instruction.
+     * Saved by initial "ldmia" instruction. NOTE: comment might be wrong
      */
     register_t r8;
     register_t r9;
@@ -47,7 +47,7 @@ struct stack_registers {
     register_t r11;
     
     /*
-     * Saved by the first "push" instruction.
+     * Saved by the first "push" instruction. NOTE: comment might be wrong
      */
     register_t r4;
     register_t r5;
@@ -55,9 +55,11 @@ struct stack_registers {
     register_t r7;
 
     /*
-     * Saved by the second "push" instruction.
+     * Saved by the second "push" instruction. NOTE: comment might be wrong
      */
-    register_t padding; /* NOT A REAL VALUE*/
+
+    /* Required for padding purposes, ARM calling convention saves these */
+    register_t padding; // NOT A REAL VALUE
     register_t lr;
 };
 typedef struct stack_registers stack_registers_t;

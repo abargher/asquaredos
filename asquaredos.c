@@ -4,8 +4,8 @@
 
 #include "kern/context_switch.h"
 
-#define RAM_ADDR (SRAM_BASE + (64 * 1024))
-#define FLASH_ADDR (XIP_BASE + (64 * 1024))
+#define RAM_ADDR (SRAM_BASE + (128 * 1024))
+#define FLASH_ADDR (XIP_BASE + (128 * 1024))
 
 int main () {
   /* Load the program into flash memory with the following command: */

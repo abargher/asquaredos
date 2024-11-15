@@ -1,7 +1,7 @@
 #define KERNEL
 
 #include <string.h>
-#include <stdio.h>
+// #include <stdio.h>
 #include "boot.h"
 #include "utils/list.h"
 #include "utils/panic.h"
@@ -73,8 +73,7 @@ create_system_resources(
      * Align stack pointer correctly pop our initial saved registers.
      */
     pcb->saved_sp -= sizeof(stack_registers_t);
-    // printf("stack pointer is: %p\n", pcb->saved_sp);
-
+    
     for (int i = 0; i < 128; i++) {
         *((char *)pcb->saved_sp - i) = i;
     }
@@ -82,16 +81,14 @@ create_system_resources(
     /*
      * Resume execution at the beginning of the binary.
      */
+    
     memset((void *)pcb->saved_sp, 0xab, sizeof(stack_registers_t));
 
     stack_registers_t *stack_registers = (stack_registers_t *)pcb->saved_sp;
-    stack_registers->lr = (register_t)load_to;
+    stack_registers->lr = (register_t)load_to | 1;
     stack_registers->r8 = (register_t)(0x88888888);
     stack_registers->r5 = (register_t)(0x55555555);
-
-    // printf("hello there\n");
-    // printf("stack_reg->lr is: %p\n", &(stack_registers->lr));
-
+    
     /*
      * Make this PCB schedulable.
      */
@@ -110,7 +107,8 @@ create_system_resources(
 int
 main(void)
 {
-    stdio_init_all();
+    // stdio_init_all();
+    sleep_ms(5000);
     /*
      * Initialize the zone allocator.
      */
@@ -132,10 +130,12 @@ main(void)
 
     /* Get programs to run, and their sizes..? */
 
-    create_system_resources((void *)0x10010000, (void *)0x20010000, (64 * 1024));
+    
     create_system_resources((void *)0x10020000, (void *)0x20020000, (64 * 1024));
+    create_system_resources((void *)0x10010000, (void *)0x20010000, (64 * 1024));
 
     exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
+    
     asm("mrs r0, msp");
     asm("msr psp, r0");
     asm("svc #0");
