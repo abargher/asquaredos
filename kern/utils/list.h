@@ -111,7 +111,11 @@
  */
 #define DLL_INSERT(head, after, elem, next, prev)                              \
     do {                                                                       \
-        if ((after) == NULL) {  /* Make the element the new head.*/            \
+        /* Make the element the new head if the list was empty. Because our  */\
+        /* lists are circular in the backwards direction, after==elem        */\
+        /* indicates that the element was popped from a singleton list. I'm  */\
+        /* not 100% sure if this is the cleanest way to handle this.         */\
+        if ((after) == NULL || (after) == (elem)) {                            \
             (elem)->next = (head);                                             \
             if ((head) == NULL) {                                              \
                 (elem)->prev = (elem);                                         \
