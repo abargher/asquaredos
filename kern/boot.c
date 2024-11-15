@@ -86,9 +86,6 @@ create_system_resources(
 
     stack_registers_t *stack_registers = (stack_registers_t *)pcb->saved_sp;
     stack_registers->lr = (register_t)load_to;
-    stack_registers->r0 = (register_t)0;
-    stack_registers->r1 = (register_t)(~0);
-    stack_registers->r3 = (register_t)(0x33333333);
     stack_registers->r8 = (register_t)(0x88888888);
     stack_registers->r5 = (register_t)(0x55555555);
 
