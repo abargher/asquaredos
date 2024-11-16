@@ -71,7 +71,7 @@ palloc_find_fixed(
          * Free the trimmed head.
          */
 
-        start->size = (uint32_t)(address - (void *)&start->data);
+        start->size = (uint32_t)(address - (void *)&start->data); /* <-- TODO fix me. */
         start->prev = NULL;
 
         DLL_INSERT(heap_free_list, start->prev, start, next, prev);
@@ -105,7 +105,7 @@ palloc(
      * list if there's sufficient leftover space.
      */
     if (out && out->size >= size + sizeof(heap_region_t)) {
-        heap_region_t *leftover = (heap_region_t *)((void *)out + size);
+        heap_region_t *leftover = (heap_region_t *)((void *)out + size); /* <-- TODO fix me. */
         leftover->size = out->size - size;
         DLL_INSERT(heap_free_list, out->prev, (heap_region_t *)((void *)out->data + size), next, prev);
     }
