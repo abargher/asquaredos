@@ -66,12 +66,12 @@ create_system_resources(
     /*
      * Allocate space for the program's execution state ("binary") in memory.
      */
-    if (load_to == (void *)0x20020000) {
+    // if (load_to == (void *)0x20020000) {
         void *out = palloc(load_size, pcb, PALLOC_FLAGS_FIXED, load_to);
         printf("bin: %p - %p\n", out, out+load_size);
         assert(out == load_to);
         memcpy(load_to, load_from, load_size);
-    }
+    // }
 
     /*
      * Align stack pointer correctly pop our initial saved registers.
@@ -129,8 +129,8 @@ main(void)
     /* Get programs to run, and their sizes..? */
 
 
-    create_system_resources((void *)0x10020000, (void *)0x20020000, (64 * 1024));
-    create_system_resources((void *)0x10010000, (void *)0x20010000, (64 * 1024));
+    create_system_resources((void *)0x10020000, (void *)0x20020000, (64 * 1024) - sizeof(heap_region_t));
+    create_system_resources((void *)0x10010000, (void *)0x20010000, (64 * 1024) - sizeof(heap_region_t));
 
     exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
 
