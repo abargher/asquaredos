@@ -26,6 +26,6 @@ extern void            *heap_start         ;//__attribute__((section(KERNEL_STAT
 /*
  * Reservation of all memory (zones) belonging to the zone allocator.
  */
-extern pcb_t   kzone_pcb   ;//__attribute__((section(KERNEL_STATE_SECTION)));
+extern pcb_t           *kzone_pcb   ;//__attribute__((section(KERNEL_STATE_SECTION)));
 
 #endif /* __RESOURCES_H__ */

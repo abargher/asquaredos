@@ -10,6 +10,7 @@
 #include "context_switch.h"
 #include "pico/stdlib.h"
 #include "hardware/exception.h"
+#include "scheduler.h"
 
 /* TODO use the real value from the SDK. */
 #define KB 1024
@@ -47,8 +48,10 @@ create_system_resources(
 {
     /* TODO do we need extra space allocated for .bss (not in .bin) in SRAM? */
 
+    printf("line %d\n", __LINE__);
     pcb_t *pcb = (pcb_t *)zalloc(KZONE_PCB);
     assert(pcb != NULL);
+    printf("line %d\n", __LINE__);
 
     /*
      * The PCB starts with no allocated memory.
@@ -58,6 +61,7 @@ create_system_resources(
     /*
      * Allocate a stack.
      */
+    printf("line %d\n", __LINE__);
     void *stack = palloc(STACK_SIZE, pcb, PALLOC_FLAGS_ANYWHERE, NULL);
     printf("stack: %p - %p\n", stack, stack+STACK_SIZE);
     assert(stack != NULL);
@@ -112,6 +116,13 @@ main(void)
      */
     zinit();
 
+    /*
+     * Create a "dummy" one-time-use PCB to jumpstart scheduling.
+     */
+    kzone_pcb = zalloc(KZONE_PCB);
+    assert(kzone_pcb != NULL);
+    pcb_active = kzone_pcb;
+
     /* TODO: make a "phony" kernel PCB for as the active PCB to bootstrap scheduler. */
 
     /*
@@ -129,10 +140,20 @@ main(void)
     /* Get programs to run, and their sizes..? */
 
 
-    create_system_resources((void *)0x10020000, (void *)0x20020000, (64 * 1024) - sizeof(heap_region_t));
-    create_system_resources((void *)0x10010000, (void *)0x20010000, (64 * 1024) - sizeof(heap_region_t));
+    printf("pcb active: %p\n", pcb_active);
+    create_system_resources((void *)0x10020000, (void *)0x20020000, (64 * 1024));
+
+    printf("bin_start: %lx\n", *(long *)(0x20020000));
+
+    printf("pcb active: %p\n", pcb_active);
+    create_system_resources((void *)0x10010000, (void *)0x20010000, (64 * 1024));
+
+    printf("bin_start: %lx\n", *(long *)(0x20020000));
 
     exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
+
+    printf("pcb active: %p\n", pcb_active);
+    printf("ready queue: %p\n", ready_queue);
 
     asm("mrs r0, msp");
     asm("msr psp, r0");

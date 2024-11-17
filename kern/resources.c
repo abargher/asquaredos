@@ -11,4 +11,4 @@ void            *heap_start         ;//__attribute__((section(KERNEL_STATE_SECTI
 /*
  * Reservation of all memory (zones) belonging to the zone allocator.
  */
-pcb_t   kzone_pcb   ;//__attribute__((section(KERNEL_STATE_SECTION)));
+pcb_t           *kzone_pcb;//__attribute__((section(KERNEL_STATE_SECTION)));
