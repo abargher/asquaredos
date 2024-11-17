@@ -110,7 +110,8 @@ int
 main(void)
 {
     stdio_init_all();
-    sleep_ms(5000);
+    // sleep_ms(5000);
+    printf("\n\n\n\n==================================\n");
     /*
      * Initialize the zone allocator.
      */
@@ -135,7 +136,9 @@ main(void)
     heap_free_list = (heap_region_t *)heap_start;
     heap_free_list->next = NULL;
     heap_free_list->prev = NULL;
-    heap_free_list->size = (SRAM_SIZE) - (uint32_t)(&__bss_end__ - (SRAM_START));
+    // heap_free_list->size = (SRAM_SIZE) - (uint32_t)(&__bss_end__ - (SRAM_START));
+    heap_free_list->size = (SRAM_START + SRAM_SIZE) - (uint32_t)heap_start - sizeof(heap_region_t);
+    printf("initial free list block: [%p, %p, %p]\n", heap_free_list, heap_free_list->data, heap_free_list->data + heap_free_list->size);
 
     /* Get programs to run, and their sizes..? */
 

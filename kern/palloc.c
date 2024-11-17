@@ -35,18 +35,23 @@ palloc_find_fixed(
     void       *address)
 {
     heap_region_t *out = NULL;
-    for (out = heap_free_list; out; out = out->next) {
+    for (heap_region_t *cur = heap_free_list; cur; cur = cur->next) {
         /*
          * Check that the current block contains the entire requested region.
          */
-        if (out->data <= (uint8_t*)address &&
-            out->data + out->size >= (uint8_t*)address + size) {
-            DLL_REMOVE(heap_free_list, out, next, prev);
+        printf("FIXED: checking [%p, %p, %p]\n", cur, cur->data, cur->data + cur->size);
+        if (cur->data <= (uint8_t*)address &&
+            cur->data + cur->size >= (uint8_t*)address + size) {
+            DLL_REMOVE(heap_free_list, cur, next, prev);
+            out = cur;
             break;
         }
     }
     if (out == NULL) {
+        printf("FIXED: found nothing\n");
         return NULL;
+    } else {
+        printf("FIXED: chose[%p, %p, %p]\n", out, out->data, out->data + out->size);
     }
 
     /*
@@ -71,13 +76,14 @@ palloc_find_fixed(
          * Free the trimmed head.
          */
 
-        start->size = (uint32_t)(address - (void *)&start->data); /* <-- TODO fix me. */
+        start->size = (uint32_t)((void *)out - (void *)start->data);
         start->prev = NULL;
 
-        DLL_INSERT(heap_free_list, start->prev, start, next, prev);
+        out->size -= start->size + sizeof(heap_region_t);
+        out->prev = start;          /* Make "out" look like it was just popped. */
 
-        out->size -= start->size;
-        out->prev = start;
+        DLL_INSERT(heap_free_list, start->prev, start, next, prev);
+        printf("REINSERT TRIMMED HEAD: [%p, %p, %p]\n", start, start->data, start->data + start->size);
     }
 
     return out;
@@ -96,6 +102,7 @@ palloc(
     heap_region_t *out = flags & PALLOC_FLAGS_FIXED ?
                          palloc_find_fixed(size, hint) :
                          palloc_find_anywhere(size);
+    printf("out = %p\n", out);
     if (out == NULL) {
         return NULL;
     }
@@ -105,9 +112,10 @@ palloc(
      * list if there's sufficient leftover space.
      */
     if (out && out->size >= size + sizeof(heap_region_t)) {
-        heap_region_t *leftover = (heap_region_t *)((void *)out + size); /* <-- TODO fix me. */
-        leftover->size = out->size - size;
-        DLL_INSERT(heap_free_list, out->prev, (heap_region_t *)((void *)out->data + size), next, prev);
+        heap_region_t *leftover = (heap_region_t *)((void *)out->data + size);
+        leftover->size = out->size - size - sizeof(heap_region_t);
+        DLL_INSERT(heap_free_list, out->prev, leftover, next, prev);
+        printf("REINSERT TRIMMED TAIL: [%p, %p, %p]\n", leftover, leftover->data, leftover->data + leftover->size);
     }
 
     return out->data;
