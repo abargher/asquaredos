@@ -63,6 +63,8 @@ pico_enable_stdio_usb(asquaredos 1)
 target_link_libraries(asquaredos
         pico_stdlib
         hardware_exception
+        hardware_ticks
+        hardware_structs
         )
 
 # Add the standard include files to the build

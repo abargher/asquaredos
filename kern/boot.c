@@ -11,6 +11,7 @@
 #include "pico/stdlib.h"
 #include "hardware/exception.h"
 #include "scheduler.h"
+#include "hardware/structs/systick.h"
 
 /* TODO use the real value from the SDK. */
 #define KB 1024
@@ -110,7 +111,7 @@ int
 main(void)
 {
     stdio_init_all();
-    // sleep_ms(5000);
+    sleep_ms(5000);
     printf("\n\n\n\n==================================\n");
     /*
      * Initialize the zone allocator.
@@ -144,22 +145,35 @@ main(void)
 
 
     printf("pcb active: %p\n", pcb_active);
-    create_system_resources((void *)0x10020000, (void *)0x20020000, (64 * 1024));
+    create_system_resources((void *)0x10020000, (void *)0x20020000, (60 * 1024));
 
     printf("bin_start: %lx\n", *(long *)(0x20020000));
 
     printf("pcb active: %p\n", pcb_active);
-    create_system_resources((void *)0x10010000, (void *)0x20010000, (64 * 1024));
+    create_system_resources((void *)0x10010000, (void *)0x20010000, (60 * 1024));
 
     printf("bin_start: %lx\n", *(long *)(0x20020000));
-
-    exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
 
     printf("pcb active: %p\n", pcb_active);
     printf("ready queue: %p\n", ready_queue);
 
+    /* Unify our stack pointers */
     asm("mrs r0, msp");
     asm("msr psp, r0");
+
+    exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
+    exception_set_exclusive_handler(SYSTICK_EXCEPTION, schedule_handler);
+
+    /* Set SYST_RVR timer reset value */
+    systick_hw->csr = 0x7;
+    systick_hw->rvr = 0xffff;
+
+    printf("systick_hw->csr: 0x%x\n", systick_hw->csr);
+    printf("systick_hw->rvr: 0x%x\n", systick_hw->rvr);
+
+    // hw_set_bits((void *)0xE000E010, *(uint32_t *)(0xE000E010) | 0b11);
+
+    while (1) {}
     asm("svc #0");
 
     // p/x *(stack_registers_t * )($r2)
