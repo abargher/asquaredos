@@ -88,9 +88,29 @@ create_system_resources(
      */
 
     stack_registers_t *stack_registers = (stack_registers_t *)pcb->saved_sp;
-    stack_registers->lr = (register_t)load_to | 1;
+    memset(stack_registers, 0xeeeeeeee, sizeof(stack_registers_t));
+    // stack_registers->lr = (register_t)load_to | 1;
+    stack_registers->exc_return = (register_t)0xfffffffd;
     stack_registers->r8 = (register_t)(0x88888888);
     stack_registers->r5 = (register_t)(0x55555555);
+
+    stack_registers->pc = (register_t)load_to | 1;
+    /* TODO: What is going on here? 
+        When exception return path executes, value of PC is off by 2 registers
+        worth (8 bytes). Removing these two registers works, and all regs have
+        correct values. Are there two extra uint32_ts pushed to the stack?
+
+        See here:
+        https://developer.arm.com/documentation/dui0497/a/the-cortex-m0-processor/exception-model/exception-entry-and-return
+    */
+    // stack_registers->r0 = 0x00000000;
+    // stack_registers->r1 = 0x11111111;
+    stack_registers->r2 = 0x22222222;
+    stack_registers->r3 = 0x33333333;
+
+    stack_registers->r12 = 0x12121212;
+    stack_registers->lr = 0xdeadbeef;
+
 
     /*
      * Make this PCB schedulable.
@@ -161,7 +181,7 @@ main(void)
     asm("mrs r0, msp");
     asm("msr psp, r0");
 
-    exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
+    // exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
     exception_set_exclusive_handler(SYSTICK_EXCEPTION, schedule_handler);
 
     /* Set SYST_RVR timer reset value */

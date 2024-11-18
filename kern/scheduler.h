@@ -60,7 +60,17 @@ struct stack_registers {
 
     /* Required for padding purposes, ARM calling convention saves these */
     register_t padding; // NOT A REAL VALUE
+    register_t exc_return;
+
+    /* Hardware loaded registers */
+    // register_t r0;
+    // register_t r1;
+    register_t r2;
+    register_t r3;
+    register_t r12;
     register_t lr;
+    register_t pc;
+    register_t psr;
 };
 typedef struct stack_registers stack_registers_t;
 

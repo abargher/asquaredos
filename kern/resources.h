@@ -23,6 +23,8 @@ extern pcb_t           *ready_queue        ;//__attribute__((section(KERNEL_STAT
 extern heap_region_t   *heap_free_list     ;//__attribute__((section(KERNEL_STATE_SECTION)));     /* Free regions in the heap. */
 extern void            *heap_start         ;//__attribute__((section(KERNEL_STATE_SECTION)));     /* Starting address of the heap. */
 
+extern void *exc_return;
+
 /*
  * Reservation of all memory (zones) belonging to the zone allocator.
  */

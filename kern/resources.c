@@ -12,3 +12,9 @@ void            *heap_start         ;//__attribute__((section(KERNEL_STATE_SECTI
  * Reservation of all memory (zones) belonging to the zone allocator.
  */
 pcb_t           *kzone_pcb;//__attribute__((section(KERNEL_STATE_SECTION)));
+
+/*
+This value returns to thread mode. See below for more:
+https://developer.arm.com/documentation/dui0497/a/the-cortex-m0-processor/exception-model/exception-entry-and-return
+*/
+void *exc_return = (void *)0xFFFFFFFD;
