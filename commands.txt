@@ -5,7 +5,9 @@ picotool load -n -o 0x10010000 asquaredos.bin
 # flash a main program to the handler and exit
 sudo openocd -f interface/cmsis-dap.cfg -f target/rp2040.cfg -c "adapter speed 5000" -c "program asquaredos.elf verify reset exit"
 
-# open debugger
-arm-none-eabi-gdb build/asquaredos.elf
+# open debugger, run from root of repo
+arm-none-eabi-gdb -x gdbstart.txt build/asquaredos.elf
 
+# open serial output in screen (name of /dev/tty.usbmodem* may vary)
+screen /dev/tty.usbmodem102 115200
 
