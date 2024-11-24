@@ -10,8 +10,9 @@
  *      https://archive.fosdem.org/2018/schedule/event/multitasking_on_cortexm/attachments/slides/2602/export/events/attachments/multitasking_on_cortexm/slides/2602/Slides.pdf
  */
 
-.global schedule_handler
 .thumb_func
+.global schedule_handler
+.align 4
 schedule_handler:
     @ stmdb   psp!, {r0-r3, lr}       @ Save r0-r3, and lr (the saved PC) to the to-be-descheduled process
     push    {r3, lr}                @ Save r0-r3, and lr (the saved PC) to the to-be-descheduled process
@@ -21,10 +22,14 @@ schedule_handler:
     cmp     r0, r1                  @ Check if pcb_active == next to schedule
     beq     schedule_handler_return @ If we're scheduling the active process then this is a no-op
     bl      context_switch
+.thumb_func
+.align 4
 schedule_handler_return:
     @ ldmia   psp!, {r0-r3, pc}       @ Load r0-r3 and and the lr (into the PC) for the to-be-scheduled process
     pop     {r3, pc}                 @ Load r0-r3 and and the lr (into the PC) for the to-be-scheduled process
 
+.thumb_func
+.align 4
 context_switch:
     mrs     r2, psp         @ Write the to-be-descheduled programs's SP into r2
     mov     r3, sp          @ Write the kernel's stack pointer into r3
@@ -57,6 +62,9 @@ context_switch:
     ldmia   r2!, {r4-r7}    @ Using r2 (still the saved SP of the to-be-scheduled program), load the saved values of r4-r7
 
     /* Load the to-be-scheduled SP into PSP and return to end of handler (to set saved PC) */
+    ldmia   r2!, {r0, r1}
+    push    {r0, r1}
     msr     psp, r2         @ Save r2 (to-be-scheduled SP) as PSP
-    mov     sp, r2          @ TODO: revisit this, is it fully correct? (sets MSP = PSP)
-    bx      lr              @ return to schedule_handler_return
+    isb                     @ Ensures following instructions use correct stack
+    @ mov     sp, r2          @ TODO: revisit this, is it fully correct? (sets MSP = PSP)
+    blx      lr              @ return to schedule_handler_return

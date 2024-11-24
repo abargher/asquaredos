@@ -63,8 +63,8 @@ struct stack_registers {
     register_t exc_return;
 
     /* Hardware loaded registers */
-    // register_t r0;
-    // register_t r1;
+    register_t r0;
+    register_t r1;
     register_t r2;
     register_t r3;
     register_t r12;
