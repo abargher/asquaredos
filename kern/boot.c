@@ -46,14 +46,13 @@ void
 create_system_resources(
     void       *load_from,  /* Start of the binary in FLASH. */
     void       *load_to,    /* Start of the binary in SRAM. */
+    void       *exec_from,  /* Entrypoint of binary in SRAM. */
     uint32_t    load_size)  /* Number of bytes to copy from flash. */
 {
     /* TODO do we need extra space allocated for .bss (not in .bin) in SRAM? */
 
-    printf("line %d\n", __LINE__);
     pcb_t *pcb = (pcb_t *)zalloc(KZONE_PCB);
     assert(pcb != NULL);
-    printf("line %d\n", __LINE__);
 
     /*
      * The PCB starts with no allocated memory.
@@ -63,9 +62,7 @@ create_system_resources(
     /*
      * Allocate a stack.
      */
-    printf("line %d\n", __LINE__);
     void *stack = palloc(STACK_SIZE, pcb, PALLOC_FLAGS_ANYWHERE, NULL);
-    printf("stack: %p - %p\n", stack, stack+STACK_SIZE);
     assert(stack != NULL);
     pcb->saved_sp = ((uint32_t)stack + STACK_SIZE) & ~(0b111);   /* Start at TOP of the stack. */
 
@@ -74,7 +71,6 @@ create_system_resources(
      */
     // if (load_to == (void *)0x20020000) {
         void *out = palloc(load_size, pcb, PALLOC_FLAGS_FIXED, load_to);
-        printf("bin: %p - %p\n", out, out+load_size);
         assert(out == load_to);
         memcpy(load_to, load_from, load_size);
     // }
@@ -94,7 +90,7 @@ create_system_resources(
     stack_registers->r5 = (register_t)(0x55555555);
 
     /* TODO: clean this? unsure if + 0x298 will be correct for ALL programs */
-    stack_registers->pc = (register_t)(load_to + 0x298)| 1;
+    stack_registers->pc = (register_t)(exec_from)| 1;
     stack_registers->r0 = 0x00000000;
     stack_registers->r1 = 0x11111111;
     stack_registers->r2 = 0x22222222;
@@ -150,9 +146,6 @@ typedef struct {
 int
 main(void)
 {
-    stdio_init_all();
-    // sleep_ms(5000);
-    printf("\n\n\n\n==================================\n");
     /*
      * Initialize the zone allocator.
      */
@@ -179,30 +172,18 @@ main(void)
     heap_free_list->prev = NULL;
     // heap_free_list->size = (SRAM_SIZE) - (uint32_t)(&__bss_end__ - (SRAM_START));
     heap_free_list->size = (SRAM_START + SRAM_SIZE) - (uint32_t)heap_start - sizeof(heap_region_t);
-    printf("initial free list block: [%p, %p, %p]\n", heap_free_list, heap_free_list->data, heap_free_list->data + heap_free_list->size);
 
     /* Get programs to run, and their sizes..? */
 
 
-    printf("pcb active: %p\n", pcb_active);
-    create_system_resources((void *)0x10020000, (void *)0x20020000, (60 * 1024));
-
-    printf("bin_start: %lx\n", *(long *)(0x20020000));
-
-    printf("pcb active: %p\n", pcb_active);
-    create_system_resources((void *)0x10010000, (void *)0x20010000, (60 * 1024));
-
-    printf("bin_start: %lx\n", *(long *)(0x20020000));
-
-    printf("pcb active: %p\n", pcb_active);
-    printf("ready queue: %p\n", ready_queue);
+    create_system_resources((void *)0x10020000, (void *)0x20020000, (void *)0x20020298, (60 * 1024));
+    create_system_resources((void *)0x10010000, (void *)0x20010000, (void *)0x20010298, (60 * 1024));
 
     /* Unify our stack pointers */
     asm("mrs r0, msp");
     asm("msr psp, r0");
     asm("isb");
 
-    printf("MPU_CTRL initial: 0x%x\n", mpu_hw->ctrl);
 
     /*
     // region number register
@@ -211,7 +192,7 @@ main(void)
     for (int i = 0; i < 8; i++) {
         asm("isb");
         mpu_hw->rnr = 7;
-        
+
         // hw_set_bits(&mpu_hw->rasr, (uint32_t)((mpu_rasr_t){
         //     .enable = 1,
         //     .size = 0b11111,
@@ -241,9 +222,6 @@ main(void)
     mpu_hw->ctrl = mpu_hw->ctrl | 1;
     asm("dsb");
 
-
-    printf("RASR: 0x%x\n", mpu_hw->rasr);
-
     */
 
     exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
@@ -253,14 +231,7 @@ main(void)
     systick_hw->csr = 0x7;
     systick_hw->rvr = 0xffff;
 
-    printf("systick_hw->csr: 0x%x\n", systick_hw->csr);
-    printf("systick_hw->rvr: 0x%x\n", systick_hw->rvr);
 
     while (1) {}
     // asm("svc #0");
-    printf("hello there\n");
-
-    // p/x *(stack_registers_t * )($r2)
-    //
-    // schedule_handler();
 }

@@ -39,7 +39,6 @@ palloc_find_fixed(
         /*
          * Check that the current block contains the entire requested region.
          */
-        printf("FIXED: checking [%p, %p, %p]\n", cur, cur->data, cur->data + cur->size);
         if (cur->data <= (uint8_t*)address &&
             cur->data + cur->size >= (uint8_t*)address + size) {
             DLL_REMOVE(heap_free_list, cur, next, prev);
@@ -48,10 +47,7 @@ palloc_find_fixed(
         }
     }
     if (out == NULL) {
-        printf("FIXED: found nothing\n");
         return NULL;
-    } else {
-        printf("FIXED: chose[%p, %p, %p]\n", out, out->data, out->data + out->size);
     }
 
     /*
@@ -83,7 +79,6 @@ palloc_find_fixed(
         out->prev = start;          /* Make "out" look like it was just popped. */
 
         DLL_INSERT(heap_free_list, start->prev, start, next, prev);
-        printf("REINSERT TRIMMED HEAD: [%p, %p, %p]\n", start, start->data, start->data + start->size);
     }
 
     return out;
@@ -102,7 +97,6 @@ palloc(
     heap_region_t *out = flags & PALLOC_FLAGS_FIXED ?
                          palloc_find_fixed(size, hint) :
                          palloc_find_anywhere(size);
-    printf("out = %p\n", out);
     if (out == NULL) {
         return NULL;
     }
@@ -115,7 +109,6 @@ palloc(
         heap_region_t *leftover = (heap_region_t *)((void *)out->data + size);
         leftover->size = out->size - size - sizeof(heap_region_t);
         DLL_INSERT(heap_free_list, out->prev, leftover, next, prev);
-        printf("REINSERT TRIMMED TAIL: [%p, %p, %p]\n", leftover, leftover->data, leftover->data + leftover->size);
     }
 
     return out->data;
