@@ -54,14 +54,6 @@ struct stack_registers {
     register_t r6;
     register_t r7;
 
-    /*
-     * Saved by the second "push" instruction. NOTE: comment might be wrong
-     */
-
-    /* Required for padding purposes, ARM calling convention saves these */
-    register_t padding; // NOT A REAL VALUE
-    register_t exc_return;
-
     /* Hardware loaded registers */
     register_t r0;
     register_t r1;

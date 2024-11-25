@@ -90,12 +90,11 @@ create_system_resources(
 
     stack_registers_t *stack_registers = (stack_registers_t *)pcb->saved_sp;
     memset(stack_registers, 0xeeeeeeee, sizeof(stack_registers_t));
-    // stack_registers->lr = (register_t)load_to | 1;
-    stack_registers->exc_return = (register_t)0xfffffffd;
     stack_registers->r8 = (register_t)(0x88888888);
     stack_registers->r5 = (register_t)(0x55555555);
 
-    stack_registers->pc = (register_t)load_to | 1;
+    /* TODO: clean this? unsure if + 0x298 will be correct for ALL programs */
+    stack_registers->pc = (register_t)(load_to + 0x298)| 1;
     stack_registers->r0 = 0x00000000;
     stack_registers->r1 = 0x11111111;
     stack_registers->r2 = 0x22222222;

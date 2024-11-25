@@ -14,18 +14,17 @@
 .global schedule_handler
 .align 4
 schedule_handler:
-    @ stmdb   psp!, {r0-r3, lr}       @ Save r0-r3, and lr (the saved PC) to the to-be-descheduled process
     push    {r3, lr}                @ Save r0-r3, and lr (the saved PC) to the to-be-descheduled process
     bl      sched_get_next          @ Get the next process to load -- TODO define me
     ldr     r3, =pcb_active         @ Get the current process
     ldr     r1, [r3]                @ Dereference pcb_active
-    cmp     r0, r1                  @ Check if pcb_active == next to schedule
+    cmp     r0, r1                  @ Check if next to schedule == pcb_active
     beq     schedule_handler_return @ If we're scheduling the active process then this is a no-op
+    str     r0, [r3]                @ Store the new next to schedule process at pcb_active
     bl      context_switch
 .thumb_func
 .align 4
 schedule_handler_return:
-    @ ldmia   psp!, {r0-r3, pc}       @ Load r0-r3 and and the lr (into the PC) for the to-be-scheduled process
     pop     {r3, pc}                 @ Load r0-r3 and and the lr (into the PC) for the to-be-scheduled process
 
 .thumb_func
@@ -62,9 +61,12 @@ context_switch:
     ldmia   r2!, {r4-r7}    @ Using r2 (still the saved SP of the to-be-scheduled program), load the saved values of r4-r7
 
     /* Load the to-be-scheduled SP into PSP and return to end of handler (to set saved PC) */
-    ldmia   r2!, {r0, r1}
-    push    {r0, r1}
+
+    pop     {r0, r1}        @ Pop padding and exc_return value from stack
+    mov     r1, #0          @ Ensure that exc_return value is set to 0xfffffffd
+    sub     r1, #3          @ ...
+    push    {r0, r1}        @ Restore values to stack, now with proper exc_return value.
+
     msr     psp, r2         @ Save r2 (to-be-scheduled SP) as PSP
     isb                     @ Ensures following instructions use correct stack
-    @ mov     sp, r2          @ TODO: revisit this, is it fully correct? (sets MSP = PSP)
-    blx      lr              @ return to schedule_handler_return
+    blx     lr              @ Return to schedule_handler_return
