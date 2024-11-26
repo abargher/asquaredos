@@ -12,7 +12,9 @@
  * in the ChromiumOS source tree here:
  *      https://source.chromium.org/chromiumos/chromiumos/codesearch/+/main:src/platform/ec/core/cortex-m0/switch.S
  * ChromiumOS source code is used with modifications under a BSD-style license:
- * 
+ */
+
+/* 
  * Copyright 2010 The ChromiumOS Authors
  *
  * Redistribution and use in source and binary forms, with or without

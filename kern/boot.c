@@ -33,16 +33,6 @@
 extern char __data_start__;
 extern char __bss_end__;
 
-/*
- * TODO: find out if the RAM section of the .elf can be modified at runtime
- *       without breaking things, or if there's a compilation option to allow
- *       this sort of behavior.
- *
- *       the problem is that we think by default a binary is dependent on a
- *       known fixed base address, and that's not amenable to us dynamically
- *       allocating text/data/bss.
- */
-// inline
 void
 create_system_resources(
     void       *load_from,  /* Start of the binary in FLASH. */
@@ -75,7 +65,7 @@ create_system_resources(
     memcpy(load_to, load_from, load_size);
 
     /*
-     * Align stack pointer correctly pop our initial saved registers.
+     * Align stack pointer correctly to pop our initial saved registers.
      */
     pcb->saved_sp -= sizeof(stack_registers_t);
 
@@ -84,6 +74,8 @@ create_system_resources(
      */
 
     stack_registers_t *stack_registers = (stack_registers_t *)pcb->saved_sp;
+
+    /* Set some stack register values for easy recognition. */
     memset(stack_registers, 0xeeeeeeee, sizeof(stack_registers_t));
     stack_registers->r8 = (register_t)(0x88888888);
     stack_registers->r5 = (register_t)(0x55555555);
@@ -96,9 +88,9 @@ create_system_resources(
 
     stack_registers->r12 = 0x12121212;
     stack_registers->lr = 0xdeadbeef;
-    stack_registers->psr = 0x61000000;
-    /* TODO: figure out correct value for PSR for userprograms */
 
+    /* TODO: figure out a (more) correct value for PSR for userprograms. */
+    stack_registers->psr = 0x61000000;
 
     /*
      * Make this PCB schedulable.
@@ -110,31 +102,6 @@ create_system_resources(
      * selects this process control block to run.
      */
 }
-
-typedef struct {
-
-    int enable:1;
-    int size:5;
-
-    int reserved_0:2;
-
-    int srd:8;
-
-    int bufferable:1;
-    int cacheable:1;
-    int shareable:1;
-
-    int reserved_1:5;
-
-    int ap:3;
-
-    int reserved_2:1;
-
-    int xn:1;
-
-    int reserved_3:3;
-
-} mpu_rasr_t;
 
 /*
  * Third stage bootloader.
@@ -154,7 +121,9 @@ main(void)
     assert(kzone_pcb != NULL);
     pcb_active = kzone_pcb;
 
-    /* TODO: make a "phony" kernel PCB for as the active PCB to bootstrap scheduler. */
+    /* TODO: possibly make a "phony" kernel PCB for as the active PCB to
+     * bootstrap scheduler.
+     */
 
     /*
      * The heap will begin aligned with the first MPU-protectable address after
@@ -168,6 +137,11 @@ main(void)
     heap_free_list->prev = NULL;
     heap_free_list->size = (SRAM_START + SRAM_SIZE) - (uint32_t)heap_start - sizeof(heap_region_t);
 
+    /* Create resources for two pre-loaded programs, already present in flash
+     * at addresses 0x10020000 and 0x10010000 respectively. Each has a different
+     * entrypoint, discovered by reading the symbol tables in their .elf files.
+     * Each program is given 60KB of space (more than enough).
+     */
     create_system_resources((void *)0x10020000, (void *)0x20020000, (void *)0x20020298, (60 * 1024));
     create_system_resources((void *)0x10010000, (void *)0x20010000, (void *)0x20010298, (60 * 1024));
 
@@ -177,52 +151,20 @@ main(void)
     asm("isb");
 
 
-    /*
-    // region number register
-
-    // configure region attribute and size register to max size and enable
-    for (int i = 0; i < 8; i++) {
-        asm("isb");
-        mpu_hw->rnr = 7;
-
-        // hw_set_bits(&mpu_hw->rasr, (uint32_t)((mpu_rasr_t){
-        //     .enable = 1,
-        //     .size = 0b11111,
-        //     .srd = 0,
-        //     .bufferable = 1,
-        //     .cacheable = 1,
-        //     .shareable = 1,
-        //     .ap = 0b011,
-        //     .xn = 0,
-        // }));
-        *(mpu_rasr_t *)(&mpu_hw->rasr) = (mpu_rasr_t){
-            .enable = 1,
-            .size = 0b11111,
-            .srd = 0,
-            .bufferable = 1,
-            .cacheable = 1,
-            .shareable = 1,
-            .ap = 0b011,
-            .xn = 0,
-        };
-
-        mpu_hw->rbar = 0;
-        asm("dsb");
-    }
-
-    asm("isb");
-    mpu_hw->ctrl = mpu_hw->ctrl | 1;
-    asm("dsb");
-
-    */
-
-    exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
+    /* Register the schedule_handler as the timer interrupt handler. A voluntary
+     * "yield" call could be implemented by using the `svc` instruction and
+     * registering the schedule_handler as the SVCALL exception handler:
+     * 
+     *      exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
+     */
     exception_set_exclusive_handler(SYSTICK_EXCEPTION, schedule_handler);
 
     /* Set SYST_RVR timer reset value */
-    systick_hw->csr = 0x7;
     systick_hw->rvr = 0xffff;  /* TODO: configure this value */
 
+    /* Configure and enable SysTick counter */
+    systick_hw->csr = 0x7;
+
+    /* Timer interrupt will deschedule this process and never reschedule it. */
     while (1) {}
-    // asm("svc #0");
 }
