@@ -84,7 +84,39 @@ vm_evict_cache_page(pte_t *pte)
 cache_entry_index_t
 vm_get_cache_page(void)
 {
-    /* TODO: Check the bitmap to see if a free page exists, return if it does. */
+    /*
+     * Scan the write cache bitmap to identify any free pages.
+     */
+    for (int i = 0; i < sizeof(write_cache_bitmap); i++) {
+        /*
+         * Invert so that free pages are 1s.
+         */
+        unsigned char bitmap_entry = ~write_cache_bitmap[i];
+
+        /*
+         * If any page is free, at least one bit will be set.
+         */
+        if (!bitmap_entry) {
+            continue;
+        }
+
+        /*
+         * There is at least one unset bit. Find which one it is, and claim it.
+         *
+         * TODO: some bit-hacking could probably speed this up (or even a
+         *       dense lookup table with 256 entries --> 256 * 3 bits = 
+         *       96 bytes to make that table).
+         */
+        for (int j = 0; j < 8; j++) {
+            if (bitmap_entry & (1 << (j - 1))) {
+                /*
+                 * Claim the free page and return its index.
+                 */
+                write_cache_bitmap[i] |= (1 << (j - 1));
+                return i * 8 + j;
+            }
+        }
+    }
 
     pte_t *victim = vm_find_cache_victim();
     cache_entry_index_t entry = victim->cache.cache_index;
