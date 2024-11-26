@@ -38,17 +38,11 @@ typedef struct heap_region {
  */
 __attribute__((packed))
 struct stack_registers {
-    /*
-     * Saved by initial "ldmia" instruction. NOTE: comment might be wrong
-     */
     register_t r8;
     register_t r9;
     register_t r10;
     register_t r11;
     
-    /*
-     * Saved by the first "push" instruction. NOTE: comment might be wrong
-     */
     register_t r4;
     register_t r5;
     register_t r6;

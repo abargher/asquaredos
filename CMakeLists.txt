@@ -33,13 +33,13 @@ project(asquaredos C CXX ASM)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
+# Set additional compiler flags
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall")
 set(CMAKE_CXX_FLAGS_RELEASE "-O0")
-# Add executable. Default name is the project name, version 0.1
 
+# Add executable. Default name is the project name, version 0.1
 add_executable(asquaredos 
     kern/boot.c
-    # asquaredos.c
     kern/palloc.c
     kern/zalloc.c
     kern/resources.c

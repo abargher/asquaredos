@@ -2,24 +2,25 @@
 
 #include <string.h>
 #include <stdio.h>
+
+#include "pico/stdlib.h"
+#include "hardware/exception.h"
+#include "hardware/structs/systick.h"
+#include "hardware/structs/mpu.h"
+
 #include "boot.h"
 #include "utils/list.h"
 #include "utils/panic.h"
 #include "palloc.h"
 #include "zalloc.h"
 #include "context_switch.h"
-#include "pico/stdlib.h"
-#include "hardware/exception.h"
 #include "scheduler.h"
-#include "hardware/structs/systick.h"
-#include "hardware/structs/mpu.h"
 
-/* TODO use the real value from the SDK. */
+
 #define KB 1024
 #define SRAM_SIZE 256 * (KB)
 #define SRAM_START 0x20000000
 
-/* TODO find good value. */
 #define STACK_SIZE 4 * (KB)
 
 /* Byte granularity at which the MPU can protect a region of memory. */
@@ -69,11 +70,9 @@ create_system_resources(
     /*
      * Allocate space for the program's execution state ("binary") in memory.
      */
-    // if (load_to == (void *)0x20020000) {
-        void *out = palloc(load_size, pcb, PALLOC_FLAGS_FIXED, load_to);
-        assert(out == load_to);
-        memcpy(load_to, load_from, load_size);
-    // }
+    void *out = palloc(load_size, pcb, PALLOC_FLAGS_FIXED, load_to);
+    assert(out == load_to);
+    memcpy(load_to, load_from, load_size);
 
     /*
      * Align stack pointer correctly pop our initial saved registers.
@@ -89,7 +88,6 @@ create_system_resources(
     stack_registers->r8 = (register_t)(0x88888888);
     stack_registers->r5 = (register_t)(0x55555555);
 
-    /* TODO: clean this? unsure if + 0x298 will be correct for ALL programs */
     stack_registers->pc = (register_t)(exec_from)| 1;
     stack_registers->r0 = 0x00000000;
     stack_registers->r1 = 0x11111111;
@@ -113,7 +111,6 @@ create_system_resources(
      */
 }
 
-// __attribute__((packed))
 typedef struct {
 
     int enable:1;
@@ -142,7 +139,6 @@ typedef struct {
 /*
  * Third stage bootloader.
  */
-// __attribute__((noreturn))
 int
 main(void)
 {
@@ -170,11 +166,7 @@ main(void)
     heap_free_list = (heap_region_t *)heap_start;
     heap_free_list->next = NULL;
     heap_free_list->prev = NULL;
-    // heap_free_list->size = (SRAM_SIZE) - (uint32_t)(&__bss_end__ - (SRAM_START));
     heap_free_list->size = (SRAM_START + SRAM_SIZE) - (uint32_t)heap_start - sizeof(heap_region_t);
-
-    /* Get programs to run, and their sizes..? */
-
 
     create_system_resources((void *)0x10020000, (void *)0x20020000, (void *)0x20020298, (60 * 1024));
     create_system_resources((void *)0x10010000, (void *)0x20010000, (void *)0x20010298, (60 * 1024));
@@ -229,8 +221,7 @@ main(void)
 
     /* Set SYST_RVR timer reset value */
     systick_hw->csr = 0x7;
-    systick_hw->rvr = 0xffff;
-
+    systick_hw->rvr = 0xffff;  /* TODO: configure this value */
 
     while (1) {}
     // asm("svc #0");
