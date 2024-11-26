@@ -1,6 +1,5 @@
 #include "zalloc.h"
 #include "scheduler.h"
-#include "vm.h"
 #include "utils/list.h"
 #include "utils/panic.h"
 #include <string.h>
@@ -23,6 +22,14 @@ kzone_desc_t zone_table[N_KZONES];
 pcb_t               zone_pcbs[PCB_ZONE_ELEMS];
 pte_group_t         zone_pte_groups[PTE_GROUP_ZONE_ELEMS];
 pte_group_table_t   zone_pte_group_tables[PTE_GROUP_TABLE_ZONE_ELEMS];
+
+
+/*
+ * Export the base of the pte_group_t and pte_group_table_t zones. They are
+ * required for looking up a PTE from an address.
+ */
+const pte_group_t          *pte_groups_base         = zone_pte_groups;
+const pte_group_table_t    *pte_group_tables_base   = zone_pte_group_tables;
 
 
 /*

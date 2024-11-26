@@ -15,7 +15,6 @@
 #include "hardware/structs/mpu.h"
 
 /* TODO use the real value from the SDK. */
-#define KB 1024
 #define SRAM_SIZE 256 * (KB)
 #define SRAM_START 0x20000000
 
