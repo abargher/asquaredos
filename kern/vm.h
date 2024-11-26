@@ -48,9 +48,14 @@ typedef unsigned char pte_type_t;
  */
 __attribute__((packed))
 struct sram_pte {                   /* 16 bits. */
-    unsigned short _reserved:2;
-    unsigned short _unused:14;
+    unsigned short _reserved    :2;
+    unsigned short _unused      :14;
 };
+
+/*
+ * Index of a page in the write cache.
+ */
+typedef unsigned char cache_entry_index_t;
 
 /*
  * Page table entry for a 256B page stored in the write cache.
@@ -61,8 +66,9 @@ struct sram_pte {                   /* 16 bits. */
  */
 __attribute__((packed))
 struct cache_pte {                  /* 16 bits. */
-    unsigned short _reserved:2;
-    unsigned short _unused:14;
+    unsigned char           _reserved   :2;
+    unsigned char           _unused     :6;
+    cache_entry_index_t     cache_index :8;
 };
 
 /*
@@ -77,8 +83,8 @@ struct cache_pte {                  /* 16 bits. */
  */
 __attribute__((packed))
 struct flash_pte {                  /* 16 bits. */
-    unsigned short _reserved:2;
-    unsigned short _unused:14;
+    unsigned short _reserved    :2;
+    unsigned short _unused      :14;
 };
 
 __attribute__((packed))
@@ -148,7 +154,7 @@ typedef struct {
  */
 #define GROUP_SIZE (1 << INDEX_BITS)
 typedef struct {
-    pte_t ptes[GROUP_SIZE]
+    pte_t ptes[GROUP_SIZE];
 } pte_group_t;
 
 /*
