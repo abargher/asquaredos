@@ -14,6 +14,8 @@
  */
 typedef enum {
    KZONE_PCB,       /* pcb_t */
+   KZONE_PTE_GROUP,
+   KZONE_PTE_GROUP_TABLE,
    N_KZONES
 } kzone_id_t;
 
@@ -40,7 +42,7 @@ typedef struct {
 /*
  * State tracking for all allocator zones.
  */
-extern kzone_desc_t zone_table[N_KZONES]; //__attribute__((section("kernel_private_state")));
+extern kzone_desc_t zone_table[N_KZONES];
 
 /*
  * Initializes all zones for the zone allocator.
