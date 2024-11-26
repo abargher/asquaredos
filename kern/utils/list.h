@@ -6,8 +6,8 @@
 
 #ifndef __LIST_H__
 #define __LIST_H__
+#include <stddef.h>
 
-#define NULL (void *)0
 
 /*
  * Pop an element from the head of a single link list (FIFO). Sets out to NULL
@@ -104,14 +104,18 @@
  * are circular. Thus, x->prev will never be NULL.
  *
  * - head:  points to first element in the list.
- * - after: points to the element after where "elem" should be inserted.
+ * - after: points to the element where "elem" should be inserted after.
  * - elem:  points to the element to be inserted.
  * - next:  name of "next" field in the list struct.
  * - prev:  name of "prev" field in the list struct.
  */
 #define DLL_INSERT(head, after, elem, next, prev)                              \
     do {                                                                       \
-        if ((after) == NULL) {  /* Make the element the new head.*/            \
+        /* Make the element the new head if the list was empty. Because our  */\
+        /* lists are circular in the backwards direction, after==elem        */\
+        /* indicates that the element was popped from a singleton list. I'm  */\
+        /* not 100% sure if this is the cleanest way to handle this.         */\
+        if ((after) == NULL || (after) == (elem)) {                            \
             (elem)->next = (head);                                             \
             if ((head) == NULL) {                                              \
                 (elem)->prev = (elem);                                         \

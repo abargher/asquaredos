@@ -28,53 +28,42 @@ set(PICO_BOARD pico CACHE STRING "Board type")
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
 
-project(asquaredos C CXX ASM)
+project(userprogram C CXX ASM)
 
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
-# Set additional compiler flags
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall")
 set(CMAKE_CXX_FLAGS_RELEASE "-O0")
-
 # Add executable. Default name is the project name, version 0.1
-add_executable(asquaredos 
-    kern/boot.c
-    kern/palloc.c
-    kern/zalloc.c
-    kern/resources.c
 
-    kern/scheduler.c
+add_executable(userprogram userprogram.c)
 
-    kern/context_switch.s
-)
+pico_set_linker_script(userprogram ../memmap_no_flash_custom.ld)
 
-pico_set_program_name(asquaredos "asquaredos")
-pico_set_program_version(asquaredos "0.1")
+pico_set_program_name(userprogram "userprogram")
+pico_set_program_version(userprogram "0.1")
 
 # Generate PIO header
-pico_generate_pio_header(asquaredos ${CMAKE_CURRENT_LIST_DIR}/blink.pio)
+pico_generate_pio_header(userprogram ${CMAKE_CURRENT_LIST_DIR}/blink.pio)
 
 # Modify the below lines to enable/disable output over UART/USB
-pico_enable_stdio_uart(asquaredos 1)
-pico_enable_stdio_usb(asquaredos 1)
+pico_enable_stdio_uart(userprogram 1)
+pico_enable_stdio_usb(userprogram 1)
 
 # Add the standard library to the build
-target_link_libraries(asquaredos
-        pico_stdlib
-        hardware_exception
-        hardware_ticks
-        hardware_structs
-        )
+target_link_libraries(userprogram
+        pico_stdlib)
 
 # Add the standard include files to the build
-target_include_directories(asquaredos PRIVATE
+target_include_directories(userprogram PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}
   ${CMAKE_CURRENT_LIST_DIR}/.. # for our common lwipopts or any other standard includes, if required
 )
 
 # Add any user requested libraries
-target_link_libraries(asquaredos 
+target_link_libraries(userprogram 
         )
 
-pico_add_extra_outputs(asquaredos)
+pico_set_binary_type(userprogram no_flash)
+pico_add_extra_outputs(userprogram)
