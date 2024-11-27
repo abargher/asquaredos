@@ -162,7 +162,7 @@ typedef unsigned short flash_index_t;
 __attribute__((packed))
 struct flash_pte {                  /* 16 bits. */
     unsigned short _reserved    :2;
-    unsigned short _unused      :14;
+    unsigned short _unused      :2;
     unsigned short flash_index  :FLASH_SWAP_BITS;
 };
 
