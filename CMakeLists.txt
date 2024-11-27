@@ -65,6 +65,7 @@ target_link_libraries(asquaredos
         hardware_exception
         hardware_ticks
         hardware_structs
+        hardware_flash
         )
 
 # Add the standard include files to the build

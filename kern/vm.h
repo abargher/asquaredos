@@ -7,6 +7,8 @@
 #ifndef __VM_H__
 #define __VM_H__
 
+#include <hardware/flash.h>
+
 #define KB (1024)
 
 /*
@@ -35,14 +37,17 @@
 #define WRITE_CACHE_BITS (16)
 #define WRITE_CACHE_INDEX_BITS (WRITE_CACHE_BITS - OFFSET_BITS)
 #define WRITE_CACHE_SIZE (1 << WRITE_CACHE_BITS)
-#define WRITE_CACHE_ENTRIES (WRITE_CACHE_SIZE / PAGE_SIZE)
+#define WRITE_CACHE_NUM_ENTRIES (WRITE_CACHE_SIZE / PAGE_SIZE)
 
 /*
  * Flash swap region layout.
  */
 #define FLASH_SWAP_BASE (XIP_BASE + (1 << 20))
 #define FLASH_SWAP_BITS (12)
-#define FLASH_SWAP_SIZE (1 << FLASH_SWAP_BITS)
+#define FLASH_SWAP_SIZE (1 << FLASH_SWAP_BITS + OFFSET_BITS)
+#define FLASH_SWAP_NUM_PAGES (FLASH_SWAP_SIZE / PAGE_SIZE)
+#define FLASH_SWAP_NUM_SECTORS (FLASH_SWAP_SIZE / FLASH_SECTOR_SIZE)
+#define FLASH_SWAP_BASE_FLASH_OFS (FLASH_SWAP_BASE - XIP_BASE)
 
 /*
  * Memory will be laid out as follows:
@@ -133,10 +138,16 @@ struct cache_pte {                  /* 16 bits. */
 typedef unsigned short flash_index_t;
 
 /*
- * Convert the flash index of a flash_pte to the address of the page in flash
+ * Convert a flash_index_t to the memory mapped address of the page in flash
  * that it represents.
  */
 #define FLASH_PAGE(flash_index) (FLASH_SWAP_BASE + 256 * flash_index)
+
+/*
+ * Convert a flash_index_t to the byte offset into flash of the page that it
+ * represents.
+ */
+#define FLASH_OFFSET(flash_index) (FLASH_SWAP_BASE_FLASH_OFS + 256 * flash_index)
 
 /*
  * Page table entry for a 256B page stored in flash.
