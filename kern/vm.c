@@ -1,6 +1,7 @@
 #include "vm.h"
 #include "zalloc.h"
 #include "resources.h"
+#include <hardware/flash.h>
 #include <string.h>
 
 /*
@@ -10,15 +11,84 @@
  *       packing two PIDs into each byte. This is just a space optimization, so
  *       I'll leave the added complexity for later.
  */
-pid_t page_owner_table[1 << (GROUP_BITS + INDEX_BITS)];
+pid_t sram_page_owner_table[1 << (GROUP_BITS + INDEX_BITS)];
 
-/* TODO this table needs to be initialized to all PID_INVALID. */
+/*
+ * Table maps from cache_index_t to the PID of that entry's owner.
+ *
+ * TODO: Same space-saving optimization as described for the SRAM owner table.
+ */
+pid_t write_cache_entry_owner_table[WRITE_CACHE_NUM_ENTRIES];
+
+/* TODO these tables need to be initialized to all PID_INVALID. */
+
+/*
+ * Bitmap tracking which pages are occupied (1) and free (0) in the region of
+ * flash that we evict write cache entries to. The sector bitmap tracks which
+ * pages have never been erased (1) and have been erased (0).
+ */
+unsigned char flash_page_bitmap[FLASH_SWAP_NUM_PAGES / 8];
+unsigned char flash_sector_bitmap[FLASH_SWAP_NUM_SECTORS / 8];
 
 /*
  * Write cache. Buffers write before evicting pages to flash once at capacity.
  */
-page_t          write_cache[WRITE_CACHE_ENTRIES];
-unsigned char   write_cache_bitmap[WRITE_CACHE_ENTRIES / 8];
+page_t          write_cache[WRITE_CACHE_NUM_ENTRIES];
+unsigned char   write_cache_bitmap[WRITE_CACHE_NUM_ENTRIES / 8];
+
+#define BITMAP_OPERATION_FAILED (-1)
+
+/*
+ * Scans up to an entire bitmap, starting from the provided index, to find the
+ * index of a zero. Updates the zero to a one, and returns the index.
+ * 
+ * Returns BITMAP_OPERATION_FAILED if no zero could be found.
+ */
+unsigned int
+bitmap_find_and_set_first_zero(
+    unsigned char  *bitmap,
+    unsigned int    size_bits,
+    unsigned int    start_at)
+{
+    /*
+     * Scan the bitmap to identify any 0s.
+     */
+    for (int i = 0; i < size_bits; i++) {
+        unsigned int index = start_at + i % size_bits;
+
+        /*
+         * Invert so we can quickly identify if all bits are set.
+         */
+        unsigned char bitmap_entry = ~bitmap[index];
+
+        /*
+         * If no bits are set in the inverted entry then there were no zeros in
+         * the original, uninverted entry.
+         */
+        if (!bitmap_entry) {
+            continue;
+        }
+
+        /*
+         * There is at least one unset bit. Find which one it is, and claim it.
+         *
+         * TODO: some bit-hacking could probably speed this up (or even a
+         *       dense lookup table with 256 entries --> 256 * 3 bits = 
+         *       96 bytes to make that table).
+         */
+        for (int j = 0; j < 8; j++) {
+            if (bitmap_entry & (1 << j)) {
+                /*
+                 * Claim the free page and return its index.
+                 */
+                bitmap[index] |= (1 << j);
+                return 8 * index + j;
+            }
+        }
+    }
+
+    return BITMAP_OPERATION_FAILED;
+}
 
 /*
  * Only to be called from within the hardfault handler. Returns the address
@@ -61,12 +131,83 @@ address_to_pte(pte_group_table_t *pt, void *addr)
 }
 
 /*
- * Finds a victim page to evict from the cache using LRU.
+ * Acquires a free (already erased and unwritten) flash page from the swap
+ * region. This function will panic if no sector can be found.
  */
-pte_t *
-vm_find_cache_victim(void)
+flash_index_t
+vm_procure_flash_page(void)
 {
-    /* TODO. */
+    static unsigned int page_bitmap_start_at = 0;
+    static unsigned int sector_bitmap_start_at = 0;
+
+    /*
+     * Try to find a free page.
+     */
+    unsigned int page_index = bitmap_find_and_set_first_zero(
+        flash_page_bitmap,
+        FLASH_SWAP_NUM_PAGES,
+        page_bitmap_start_at);
+    if (page_index != BITMAP_OPERATION_FAILED) {
+        page_bitmap_start_at = page_index + 1;
+        return (flash_index_t)page_index;
+    }
+    
+    /*
+     * We couldn't find a free sector, so let's check if there's a page we've
+     * never erased, in which case we erase it and mark all of its pages as
+     * free.
+     */
+    unsigned int sector_index = bitmap_find_and_set_first_zero(
+        flash_sector_bitmap,
+        FLASH_SWAP_NUM_SECTORS,
+        sector_bitmap_start_at);
+    if (sector_index != BITMAP_OPERATION_FAILED) {
+        flash_range_erase(
+            FLASH_SWAP_BASE_FLASH_OFS + sector_index * FLASH_SECTOR_SIZE,
+            FLASH_SECTOR_SIZE);
+#ifdef FLASH_DEBUG
+        /*
+         * Ensure that we haven't worn out our flash (that the erase actually
+         * succeeded in resetting all bits to 1).
+         */
+        unsigned int n_failures = 0;
+        for (int i = 0; i < FLASH_SECTOR_SIZE; i++) {
+            if (*(FLASH_SWAP_BASE + sector_index * FLASH_SECTOR_SIZE + i) != 0xFF) {
+                n_failures++;
+            }
+        }
+        if (n_failures > 0) {
+            panic(
+                "flash erase failed; detected %u failed bytes for sector index %u (mapped at %p)",
+                n_failures,
+                sector_index,
+                (void *)(FLASH_SWAP_BASE + sector_index * FLASH_SECTOR_SIZE));
+        }
+#endif /* FLASH_DEBUG */
+        /*
+         * Update the page bitmap to indicate that we've erased this sector, and
+         * that we'll be claiming its first page.
+         */
+        page_index = sector_index * (FLASH_SECTOR_SIZE / FLASH_PAGE_SIZE);
+        flash_page_bitmap[page_index + 0] = 0x01;   /* All unoccupied except first page. */
+        flash_page_bitmap[page_index + 1] = 0x00;
+
+        /*
+         * TODO: I (with fresh eyes)--or someone else--should sanity-check that
+         * the math makes sense to be the first page in the newly erased sector.
+         */
+        return page_index;
+    }
+
+    /*
+     * We failed to find a free page, and there were no unerased sectors. Until
+     * we implement some sort of garbage collection we'll need to panic here,
+     * since there's no currently implemented way to acquire a page.
+     */
+    panic("failed to procure a flash page; TODO: implement garbage collection");
+
+    __builtin_unreachable;
+    return 0;
 }
 
 /*
@@ -74,16 +215,88 @@ vm_find_cache_victim(void)
  * contents of the page into flash.
  */
 void
-vm_evict_cache_page(pte_t *pte)
+vm_evict_cache_entry(pte_t *pte)
 {
     /*
-     * Get an unused page in flash.
+     * Get an unused sector (same size as a page) in flash. Note this will panic
+     * if it fails to procure a page, so no error checking is required.
      */
+    flash_index_t flash_index = vm_procure_flash_page();
     
     /*
-     * We first need to get a free page in flash
+     * Write the contents of the cache entry to the flash page.
      */
-    /* TODO. */
+    flash_range_program(
+        FLASH_OFFSET(flash_index),
+        vm_get_page_contents(pte),
+        PAGE_SIZE);
+    
+    /*
+     * Update the PTE to point to flash.
+     */
+    pte->type = PTE_FLASH;
+    pte->flash.flash_index = flash_index;
+
+    /*
+     * This cache entry can now be safely overwritten.
+     */
+}
+
+/*
+ * Finds a victim page to evict from the cache using LRU.
+ */
+pte_t *
+vm_find_cache_victim(void)
+{
+    /*
+     * In order to ensure fairness, we need to always run the eviction clock
+     * hand starting from the last place we found a victim.
+     */
+    static cache_index_t index = 0;
+
+    /*
+     * Keep looping over the cache entries until we find one that 
+     */
+    while (1) {
+        /*
+         * Not really necessary since index is only a char and can't exceed 255,
+         * but it doesn't really hurt.
+         */
+        index &= 0xFF;
+
+        /*
+         * Meta TODO for performance: it seems somewhat inefficient to have to
+         * re-do this lookup every single time... we could change the lookup
+         * table to instead give the index of the PTE that owns the entry,
+         * instead of the PTE group table that owns the entry.
+         */
+
+        /*
+         * Find who owns the 
+         */
+        pid_t owner = write_cache_entry_owner_table[index];
+        if (owner == PID_INVALID) {
+            /*
+             * If no-one owns this page (this should not happen, since we should
+             * have already scanned the bitmap for a free page) then we'll just
+             * use this page and make sure it's marked in the bitmap.
+             */
+            write_cache_bitmap[index / 8] |= (1 << index % 8);
+            return index++;
+        }
+        pte_group_table_t *pt = &pte_group_tables_base[owner];
+        pte_t *pte = address_to_pte(pt, CACHE_PAGE(index));
+
+        if (pte->cache.dirty == 0) {
+            return index++;
+        }
+
+        /*
+         * This entry is not yet evictable. Age the entry and try the next one.
+         */
+        pte->cache.dirty--;
+        index++;
+    }
 }
 
 /*
@@ -94,43 +307,26 @@ vm_evict_cache_page(pte_t *pte)
 cache_index_t
 vm_procure_cache_entry(void)
 {
+    static unsigned int bitmap_start_at = 0;
+
     /*
-     * Scan the write cache bitmap to identify any free pages.
+     * Try to find an unused entry, if one exists.
      */
-    for (int i = 0; i < sizeof(write_cache_bitmap); i++) {
-        /*
-         * Invert so that free pages are 1s.
-         */
-        unsigned char bitmap_entry = ~write_cache_bitmap[i];
-
-        /*
-         * If any page is free, at least one bit will be set.
-         */
-        if (!bitmap_entry) {
-            continue;
-        }
-
-        /*
-         * There is at least one unset bit. Find which one it is, and claim it.
-         *
-         * TODO: some bit-hacking could probably speed this up (or even a
-         *       dense lookup table with 256 entries --> 256 * 3 bits = 
-         *       96 bytes to make that table).
-         */
-        for (int j = 0; j < 8; j++) {
-            if (bitmap_entry & (1 << (j - 1))) {
-                /*
-                 * Claim the free page and return its index.
-                 */
-                write_cache_bitmap[i] |= (1 << (j - 1));
-                return i * 8 + j;
-            }
-        }
+    unsigned int index = bitmap_find_and_set_first_zero(
+        write_cache_bitmap,
+        sizeof(write_cache_bitmap) * 8,
+        bitmap_start_at);
+    if (index != BITMAP_OPERATION_FAILED) {
+        bitmap_start_at = index + 1;
+        return (cache_index_t)index;
     }
 
-    pte_t *victim = vm_find_cache_victim(); /* TODO: Implement me. */
+    /*
+     * We couldn't find an unused entry, so we need to evict one.
+     */
+    pte_t *victim = vm_find_cache_victim();
     cache_index_t entry = victim->cache.cache_index;
-    vm_evict_cache_page(victim);    /* TODO: Implement me. */
+    vm_evict_cache_entry(victim);
 
     return entry;
 }
@@ -138,7 +334,7 @@ vm_procure_cache_entry(void)
 /*
  * Return a READ-ONLY pointer to the content pointed to by a PTE.
  */
-page_t *
+static inline page_t *
 vm_get_page_contents(pte_t *pte)
 {
     switch (pte->type) {
@@ -150,31 +346,9 @@ vm_get_page_contents(pte_t *pte)
             return CACHE_PAGE(pte->cache.cache_index);
         case PTE_FLASH:
             return FLASH_PAGE(pte->flash.flash_index);
+        default:
+            panic("PTE has unknown type; should not be possible");
     }
-}
-
-/*
- * Do a bitwise comparison to check if the two pages are identical. We'll
- * eagerly return when we find anything that is not equal.
- * 
- * Returns true if identical, false if different.
- */
-static bool
-vm_check_pages_identical(page_t *page_a, page_t *page_b)
-{
-    long long *a = (long long *)page_a;
-    long long *b = (long long *)page_b;
-
-    /*
-     * Compare 64 bits at a time...
-     */
-    for (int i = 0; i < PAGE_SIZE / sizeof(long long); i++) {
-        if (a[i] != b[i]) {
-            return false;
-        }
-    }
-
-    return true;
 }
 
 /*
@@ -192,7 +366,7 @@ vm_evict_sram_page(page_t *page)
      * Find who currently owns this page. If no-one does, then we can treat it
      * as already having been evicted.
      */
-    pid_t owner = page_owner_table[PAGE_NUMBER(page)];
+    pid_t owner = sram_page_owner_table[PAGE_NUMBER(page)];
     if (owner == PID_INVALID) {
         return;
     }
@@ -217,7 +391,7 @@ vm_evict_sram_page(page_t *page)
      */
     if (pte->type > PTE_SRAM) {
         page_t *backing_page = vm_get_page_contents(pte);
-        if (vm_check_pages_identical(page, backing_page)) {
+        if (memcmp(page, backing_page, PAGE_SIZE) == 0) {
             return;
         }
     }
@@ -246,8 +420,9 @@ vm_evict_sram_page(page_t *page)
     /*
      * Procure an entry in the write cache and update this PTE to point to it.
      */
-    cache_index_t entry = vm_procure_cache_entry(); /* TODO this needs to be implemented. */
-    memcpy(FLASH_PAGE(entry), page, PAGE_SIZE);
+    cache_index_t entry = vm_procure_cache_entry();
+    write_cache_entry_owner_table[entry] = owner;
+    memcpy(CACHE_PAGE(entry), page, PAGE_SIZE);
     pte->type = PTE_CACHE;
     pte->cache.cache_index = entry;
 
@@ -259,7 +434,7 @@ vm_evict_sram_page(page_t *page)
      * 
      * I'm not 100% sure what we should set the dirty counter to initially. We
      * should probably protect newly cached pages from being immediately thrown
-     * out if we initialize the value to 1. (e.g., is a newly cached entry worth
+     * out if we initialize the value to 1. (i.e., is a newly cached entry worth
      * more than an entry that's already at a low "frequency" of access?)
      */
     pte->cache.dirty = 2;
@@ -297,7 +472,7 @@ vm_fault_handler(void)
     void *addr = get_faulting_address();
     if (addr < VM_START || addr >= VM_END) {
         /* TODO: call original hardfault handler or kill the process... */
-        exit(-1);
+        panic("faulting address out of range; TODO implement handling");
     }
 
     /*
