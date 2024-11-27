@@ -1,6 +1,7 @@
 #include "vm.h"
 #include "zalloc.h"
 #include "resources.h"
+#include <string.h>
 
 /*
  * Table maps from page number (GROUP and INDEX bits) to PID.
@@ -10,6 +11,8 @@
  *       I'll leave the added complexity for later.
  */
 pid_t page_owner_table[1 << (GROUP_BITS + INDEX_BITS)];
+
+/* TODO this table needs to be initialized to all PID_INVALID. */
 
 /*
  * Write cache. Buffers write before evicting pages to flash once at capacity.
@@ -126,6 +129,48 @@ vm_get_cache_page(void)
 }
 
 /*
+ * Return a READ-ONLY pointer to the content pointed to by a PTE.
+ */
+page_t *
+vm_get_page_contents(pte_t *pte)
+{
+    switch (pte->type) {
+        case PTE_INVALID:
+            return NULL;
+        case PTE_SRAM:
+            return SRAM_BASE + 256 * pte->sram.page_number;
+        case PTE_CACHE:
+            return write_cache + 256 * pte->cache.cache_index;
+        case PTE_FLASH:
+            return FLASH_SWAP_BASE + 256 * pte->flash.flash_index;
+    }
+}
+
+/*
+ * Do a bitwise comparison to check if the two pages are identical. We'll
+ * eagerly return when we find anything that is not equal.
+ * 
+ * Returns true if identical, false if different.
+ */
+static bool
+vm_check_pages_identical(page_t *page_a, page_t *page_b)
+{
+    long long *a = (long long *)page_a;
+    long long *b = (long long *)page_b;
+
+    /*
+     * Compare 64 bits at a time...
+     */
+    for (int i = 0; i < PAGE_SIZE / sizeof(long long); i++) {
+        if (a[i] != b[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/*
  * Evict the given page from SRAM. Guarantees that the page is unoccupied upon
  * function return.
  * 
@@ -134,8 +179,64 @@ vm_get_cache_page(void)
  * be silently dropped.
  */
 void
-vm_evict_sram_page(pte_group_table_t *pt, page_t *page)
+vm_evict_sram_page(page_t *page)
 {
+    /*
+     * Find who currently owns this page. If no-one does, then we can treat it
+     * as already having been evicted.
+     */
+    pid_t owner = page_owner_table[PAGE_NUMBER(page)];
+    if (owner == PID_INVALID) {
+        return;
+    }
+
+    /*
+     * Otherwise, we'll get the owner's page table and figure out what to do
+     * with the page, depending on whether or not it's dirty.
+     */
+    pte_group_table_t *pt = &pte_group_tables_base[owner];
+    pte_t *pte = address_to_pte(pt, page);
+    if (pte == NULL || pte->type == PTE_INVALID) {
+        /*
+         * This shouldn't happen, but it should be equivalent to the earlier
+         * case of no one owning the page.
+         */
+        return;
+    }
+
+    /*
+     * If this page is backed by the write cache or flash then we can check it
+     * is clean; if it's clean, we can silently drop it.
+     */
+    if (pte->type > PTE_SRAM) {
+        page_t *backing_page = vm_get_page_contents(pte);
+        if (vm_check_pages_identical(page, backing_page)) {
+            return;
+        }
+    }
+
+    /*
+     * At this point, the page cannot be silently dropped. It needs to be
+     * evicted into the write cache, and if the backing PTE was a flash PTE
+     * then we need to mark that flash sector as invalid in our flash bitmap.
+     */
+    
+    /*
+     * If the page is backed by a write cache entry, we can re-use that entry.
+     */
+    if (pte->type == PTE_CACHE) {
+        memcpy(vm_get_page_contents(pte), page, PAGE_SIZE);
+
+        /* TODO: update whatever LRU mechanism we'll have in the write cache. */
+
+        return;
+    }
+
+    /*
+     * At this point we need to procure an entry in the write cache and copy the
+     * contents of the page we're evicting from SRAM into it.
+     */
+
     /* TODO. */
 }
 
@@ -190,7 +291,7 @@ vm_fault_handler(void)
     void *subregion_base = MPU_SUBREGION_BASE(addr);
     for (unsigned offset = 0; offset < MPU_SUBREGION_SIZE; offset += PAGE_SIZE) {
         page_t *page = subregion_base + offset;
-        vm_evict_sram_page(&pcb_active->page_table, page); /* TODO. */
+        vm_evict_sram_page(page); /* TODO. */
     }
 
     /*
