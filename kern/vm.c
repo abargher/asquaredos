@@ -76,6 +76,12 @@ vm_find_cache_victim(void)
 void
 vm_evict_cache_page(pte_t *pte)
 {
+    /*
+     * Get an unused page in flash.
+     */
+    /*
+     * We first need to get a free page in flash
+     */
     /* TODO. */
 }
 
@@ -84,8 +90,8 @@ vm_evict_cache_page(pte_t *pte)
  * yet at capacity. Otherwise, the page will be stolen from a victim that gets
  * evicted to flash.
  */
-cache_entry_index_t
-vm_get_cache_page(void)
+cache_index_t
+vm_procure_cache_entry(void)
 {
     /*
      * Scan the write cache bitmap to identify any free pages.
@@ -121,9 +127,9 @@ vm_get_cache_page(void)
         }
     }
 
-    pte_t *victim = vm_find_cache_victim();
-    cache_entry_index_t entry = victim->cache.cache_index;
-    vm_evict_cache_page(victim);
+    pte_t *victim = vm_find_cache_victim(); /* TODO: Implement me. */
+    cache_index_t entry = victim->cache.cache_index;
+    vm_evict_cache_page(victim);    /* TODO: Implement me. */
 
     return entry;
 }
@@ -138,11 +144,11 @@ vm_get_page_contents(pte_t *pte)
         case PTE_INVALID:
             return NULL;
         case PTE_SRAM:
-            return SRAM_BASE + 256 * pte->sram.page_number;
+            return SRAM_PAGE(pte->sram.page_number);
         case PTE_CACHE:
-            return write_cache + 256 * pte->cache.cache_index;
+            return CACHE_PAGE(pte->cache.cache_index);
         case PTE_FLASH:
-            return FLASH_SWAP_BASE + 256 * pte->flash.flash_index;
+            return FLASH_PAGE(pte->flash.flash_index);
     }
 }
 
@@ -237,10 +243,18 @@ vm_evict_sram_page(page_t *page)
      * contents of the page we're evicting from SRAM into it.
      */
 
-    /* TODO. */
+    /*
+     * Procure an entry in the write cache and update this PTE to point to it.
+     */
+    cache_index_t entry = vm_procure_cache_entry(); /* TODO this needs to be implemented. */
+    memcpy(FLASH_PAGE(entry), page, PAGE_SIZE);
+    pte->type = PTE_CACHE;
+    pte->flash.flash_index = entry;
+
+    /*
+     * The SRAM page can now be safely overwritten.
+     */
 }
-
-
 
 /*
  * Look up each PTE associated with the given MPU subregion and read in the data
@@ -254,11 +268,10 @@ vm_evict_sram_page(page_t *page)
  * TODO: implement a simple optimization to prevent us swapping out zeroes.
  */
 void
-vm_get_subregion(pte_group_table_t *pt, void *subregion)
+vm_read_in_subregion(pte_group_table_t *pt, void *subregion)
 {
     /* TODO. */
 }
-
 
 /*
  * This fault handler will replace the hardfault handler, and will fall through
@@ -291,7 +304,7 @@ vm_fault_handler(void)
     void *subregion_base = MPU_SUBREGION_BASE(addr);
     for (unsigned offset = 0; offset < MPU_SUBREGION_SIZE; offset += PAGE_SIZE) {
         page_t *page = subregion_base + offset;
-        vm_evict_sram_page(page); /* TODO. */
+        vm_evict_sram_page(page);
     }
 
     /*
@@ -299,7 +312,7 @@ vm_fault_handler(void)
      * or otherwise allocate and initialize that portion of the page table if
      * it does not exist.
      */
-    vm_get_subregion(&pcb_active->page_table, subregion_base); /* TODO. */
+    vm_read_in_subregion(&pcb_active->page_table, subregion_base); /* TODO. */
     mpu_enable_subregion(subregion_base); /* TODO. */
 
     /*
