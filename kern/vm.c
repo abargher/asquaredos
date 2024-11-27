@@ -79,6 +79,7 @@ vm_evict_cache_page(pte_t *pte)
     /*
      * Get an unused page in flash.
      */
+    
     /*
      * We first need to get a free page in flash
      */
@@ -232,8 +233,7 @@ vm_evict_sram_page(page_t *page)
      */
     if (pte->type == PTE_CACHE) {
         memcpy(vm_get_page_contents(pte), page, PAGE_SIZE);
-
-        /* TODO: update whatever LRU mechanism we'll have in the write cache. */
+        pte->cache.dirty++;
 
         return;
     }
@@ -249,7 +249,20 @@ vm_evict_sram_page(page_t *page)
     cache_index_t entry = vm_procure_cache_entry(); /* TODO this needs to be implemented. */
     memcpy(FLASH_PAGE(entry), page, PAGE_SIZE);
     pte->type = PTE_CACHE;
-    pte->flash.flash_index = entry;
+    pte->cache.cache_index = entry;
+
+    /*
+     * My goal is to evict pages which are least frequently dirtied, since the
+     * purpose of the write cache is to reduce the number of writes/erases we
+     * need to make to flash, and these pages seem likely to be dirtied less in
+     * the near-future.
+     * 
+     * I'm not 100% sure what we should set the dirty counter to initially. We
+     * should probably protect newly cached pages from being immediately thrown
+     * out if we initialize the value to 1. (e.g., is a newly cached entry worth
+     * more than an entry that's already at a low "frequency" of access?)
+     */
+    pte->cache.dirty = 2;
 
     /*
      * The SRAM page can now be safely overwritten.
