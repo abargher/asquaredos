@@ -117,9 +117,14 @@ typedef unsigned char cache_index_t;
  */
 __attribute__((packed))
 struct cache_pte {                  /* 16 bits. */
-    unsigned char           _reserved   :2;
-    unsigned char           _unused     :6;
-    cache_index_t     cache_index :WRITE_CACHE_INDEX_BITS;
+    unsigned char   _reserved   :2;
+    unsigned char   _unused     :3;
+    unsigned char   dirty       :3; /* Increment when page written or re-written
+                                       and decremented by eviction clock. Used
+                                       to approximate which pages are most
+                                       frequently dirtied, so that we evict the
+                                       pages which are least frequently dirtied. */
+    cache_index_t   cache_index :WRITE_CACHE_INDEX_BITS;
 };
 
 /*
