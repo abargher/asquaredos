@@ -10,6 +10,41 @@
 #define KB (1024)
 
 /*
+ * There is a 256KB (2^18 bytes) addressable range of SRAM. Addresses can thus
+ * be treated as 18 bit after subtracting the base address of SRAM, and will be
+ * interpreted as follows:
+ * 
+ *      00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17
+ *      [    group:6    ] [ index:4 ] [    page offset:8    ]
+ */
+
+#define GROUP_BITS  6
+#define INDEX_BITS  4
+#define OFFSET_BITS 8
+
+#define PAGE_NUMBER_MASK    0x3FF
+#define GROUP_MASK          0x3F
+#define INDEX_MASK          0x0F
+#define OFFSET_MASK         0xFF
+
+#define PAGE_SIZE (1 << OFFSET_BITS)
+
+/*
+ * Write cache size is determined by number of pages it contains.
+ */
+#define WRITE_CACHE_BITS (16)
+#define WRITE_CACHE_INDEX_BITS (WRITE_CACHE_BITS - OFFSET_BITS)
+#define WRITE_CACHE_SIZE (1 << WRITE_CACHE_BITS)
+#define WRITE_CACHE_ENTRIES (WRITE_CACHE_SIZE / PAGE_SIZE)
+
+/*
+ * Flash swap region layout.
+ */
+#define FLASH_SWAP_BASE (XIP_BASE + (1 << 20))
+#define FLASH_SWAP_BITS (12)
+#define FLASH_SWAP_SIZE (1 << FLASH_SWAP_BITS)
+
+/*
  * Memory will be laid out as follows:
  *
  * LOW                                                                     HIGH
@@ -49,7 +84,8 @@ typedef unsigned char pte_type_t;
 __attribute__((packed))
 struct sram_pte {                   /* 16 bits. */
     unsigned short _reserved    :2;
-    unsigned short _unused      :14;
+    unsigned short _unused      :4;
+    unsigned short page_number  :10;
 };
 
 /*
@@ -68,7 +104,7 @@ __attribute__((packed))
 struct cache_pte {                  /* 16 bits. */
     unsigned char           _reserved   :2;
     unsigned char           _unused     :6;
-    cache_entry_index_t     cache_index :8;
+    cache_entry_index_t     cache_index :WRITE_CACHE_INDEX_BITS;
 };
 
 /*
@@ -85,6 +121,7 @@ __attribute__((packed))
 struct flash_pte {                  /* 16 bits. */
     unsigned short _reserved    :2;
     unsigned short _unused      :14;
+    unsigned short flash_index  :FLASH_SWAP_BITS;
 };
 
 __attribute__((packed))
@@ -94,24 +131,6 @@ typedef union {                     /* 16 bits. */
     struct cache_pte    cache;
     struct flash_pte    flash;
 } pte_t;
-
-/*
- * There is a 256KB (2^18 bytes) addressable range of SRAM. Addresses can thus
- * be treated as 18 bit after subtracting the base address of SRAM, and will be
- * interpreted as follows:
- * 
- *      00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17
- *      [    group:6    ] [ index:4 ] [    page offset:8    ]
- */
-
-#define GROUP_BITS  6
-#define INDEX_BITS  4
-#define OFFSET_BITS 8
-
-#define PAGE_NUMBER_MASK    0x3FF
-#define GROUP_MASK          0x3F
-#define INDEX_MASK          0x0F
-#define OFFSET_MASK         0xFF
 
 /*
  * MPU region details.
@@ -137,16 +156,9 @@ typedef union {                     /* 16 bits. */
 /*
  * A single 256 byte page. Can be present in SRAM, write cache, or flash.
  */
-#define PAGE_SIZE (1 << OFFSET_BITS)
 typedef struct {
     unsigned char data[PAGE_SIZE];
 } page_t;
-
-/*
- * Write cache size is determined by number of pages it contains.
- */
-#define WRITE_CACHE_SIZE (32 * KB)
-#define WRITE_CACHE_ENTRIES (WRITE_CACHE_SIZE / PAGE_SIZE)
 
 /*
  * A group of zone-allocated PTEs. Indexed by the "index" bits of an address.
