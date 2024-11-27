@@ -75,6 +75,16 @@ typedef unsigned char pte_type_t;
 #define PTE_FLASH   (0b11)
 
 /*
+ * 10-bit index of a page in SRAM.
+ */
+typedef unsigned short page_number_t;
+
+/*
+ * Convert a page_number_t to the address of the page it represents in memory.
+ */
+#define SRAM_PAGE(page_number) (SRAM_BASE + 256 * page_number)
+
+/*
  * Page table entry for a 256B page stored in SRAM.
  *
  * An SRAM PTE will only be used for a page that has never been evicted, as
@@ -85,13 +95,18 @@ __attribute__((packed))
 struct sram_pte {                   /* 16 bits. */
     unsigned short _reserved    :2;
     unsigned short _unused      :4;
-    unsigned short page_number  :10;
+    page_number_t  page_number  :10;
 };
 
 /*
  * Index of a page in the write cache.
  */
-typedef unsigned char cache_entry_index_t;
+typedef unsigned char cache_index_t;
+
+/*
+ * Convert a cache_index_t to the address of the page it represents.
+ */
+#define CACHE_PAGE(cache_index) (write_cache + 256 * cache_index)
 
 /*
  * Page table entry for a 256B page stored in the write cache.
@@ -104,8 +119,19 @@ __attribute__((packed))
 struct cache_pte {                  /* 16 bits. */
     unsigned char           _reserved   :2;
     unsigned char           _unused     :6;
-    cache_entry_index_t     cache_index :WRITE_CACHE_INDEX_BITS;
+    cache_index_t     cache_index :WRITE_CACHE_INDEX_BITS;
 };
+
+/*
+ * FLASH_SWAP_BITS-bit index of a page in the flash swap region.
+ */
+typedef unsigned short flash_index_t;
+
+/*
+ * Convert the flash index of a flash_pte to the address of the page in flash
+ * that it represents.
+ */
+#define FLASH_PAGE(flash_index) (FLASH_SWAP_BASE + 256 * flash_index)
 
 /*
  * Page table entry for a 256B page stored in flash.
