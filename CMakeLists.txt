@@ -48,6 +48,8 @@ add_executable(asquaredos
     kern/scheduler.c
 
     kern/context_switch.s
+
+    third-party/m0FaultDispatch.c
 )
 
 pico_set_program_name(asquaredos "asquaredos")
