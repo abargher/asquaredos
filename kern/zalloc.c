@@ -13,7 +13,7 @@ kzone_desc_t zone_table[N_KZONES];
  * Define the size of each zone.
  */
 #define PCB_ZONE_ELEMS (MAX_PROCESSES + 1)
-#define PTE_GROUP_ZONE_ELEMS (256)                  /* Absolutely must not exceed 256. */
+#define PTE_GROUP_ZONE_ELEMS (255)  /* Absolutely must not exceed 255. The index of the 256th element is reserved for PTE_GROUP_INVALID. */
 #define PTE_GROUP_TABLE_ZONE_ELEMS (MAX_PROCESSES)
 
 /*
@@ -28,7 +28,7 @@ pte_group_table_t   zone_pte_group_tables[PTE_GROUP_TABLE_ZONE_ELEMS];
  * Export the base of the pte_group_t and pte_group_table_t zones. They are
  * required for looking up a PTE from an address.
  */
-pte_group_t        *pte_groups_base         = zone_pte_groups;
+pte_group_t        *pte_groups_base         = zone_pte_groups - 1;
 pte_group_table_t  *pte_group_tables_base   = zone_pte_group_tables;
 
 

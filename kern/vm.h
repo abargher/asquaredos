@@ -119,7 +119,6 @@ typedef unsigned char cache_index_t;
  * indication of such. If present in SRAM, the contents of the page in SRAM will
  * be compared to the contents pointed to by this PTE before overwriting.
  */
-__attribute__((packed))
 struct cache_pte {                  /* 16 bits. */
     unsigned char   _reserved   :2;
     unsigned char   _unused     :3;
@@ -129,7 +128,7 @@ struct cache_pte {                  /* 16 bits. */
                                        frequently dirtied, so that we evict the
                                        pages which are least frequently dirtied. */
     cache_index_t   cache_index :WRITE_CACHE_INDEX_BITS;
-};
+} __attribute__((packed));
 
 /*
  * FLASH_SWAP_BITS-bit index of a page in the flash swap region.
@@ -217,6 +216,7 @@ typedef struct {
  * must not contain more than 256 elements.
  */
 #define N_GROUPS (1 << GROUP_BITS)
+#define PTE_GROUP_INVALID (0xFF)    /* Reserved index; zone only contains 255 elements. */
 typedef unsigned char pte_group_index_t;
 typedef struct {
     pte_group_index_t groups[N_GROUPS];

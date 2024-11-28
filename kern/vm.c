@@ -58,7 +58,7 @@ bitmap_find_and_set_first_zero(
      * Scan the bitmap to identify any 0s.
      */
     for (int i = 0; i < size_bits; i++) {
-        unsigned int index = start_at + i % size_bits;
+        unsigned int index = (start_at + i) % size_bits;
 
         /*
          * Invert so we can quickly identify if all bits are set.
@@ -458,7 +458,7 @@ vm_read_in_subregion(pte_group_table_t *pt, void *subregion)
      * and configure them, since this is the first time this processes will have
      * accessed an address in this MPU subregion.
      */
-    if (pt->groups[GROUP(subregion)] == NULL) { /* TODO FIX ME THIS IS BROKEN. HOW TO INDICATE ERROR? */
+    if (pt->groups[GROUP(subregion)] == PTE_GROUP_INVALID) {
         /*
          * Allocate a new PTE group.
          */
@@ -548,18 +548,25 @@ vm_fault_handler(void *addr)
     mpu_enable_subregion(subregion_base); /* TODO. */
 
     /*
-     * Re-try the instruction that triggered the fault (TODO).
-     *
-     *      --> I think we need to pop the saved PC from the program's stack,
-     *          subtract 2 bytes, and push it back on.
+     * Re-try the instruction that triggered the fault. Note that this will
+     * fail badly if the fault did not occur while it was in thread mode, and
+     * while it was using the program stack pointer. This should never be the
+     * case if this code is reached, however, since at this point the fault must
+     * have been a read or write fault in the VM-managed range of SRAM, which
+     * would not occur while executing in handler mode, and we never use the MSP
+     * while in thread mode.
      */
-
-    /*
-     * Return from the fault.
-     *
-     * TODO: is this the right way to return from the fault?
-     */
-    asm("pop {r3, pc}");    /* r3 should be padding, PC should get 0xfffffffd. */
+    asm volatile (
+        ".thumb                     \n\t"
+        ".align 4                   \n\t"
+        "mrs    r0, psp             \n\t"
+        "ldr    r1, [r0, #24]       \n\t"   /* Load saved PC from the program stack. */
+        "sub    r1, #2              \n\t"   /* Decrement PC to point at faulting instruction. */
+        "str    r1, [r0, #24]       \n\t"   /* Save modified PC back to the program stack. */
+        "pop    {r0, pc}            \n\t"   /* Return from the exception. */
+        :
+        :
+        : "memory", "r0", "r1");
 
     __builtin_unreachable();
 }
