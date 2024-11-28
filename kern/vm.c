@@ -505,6 +505,12 @@ vm_read_in_subregion(pte_group_table_t *pt, void *subregion)
     }
 }
 
+void
+mpu_enable_subregion(void *subregion)
+{
+    /* TODO: define me. */
+}
+
 /*
  * This fault handler will replace the hardfault handler, and will fall through
  * to that handler if the faulting address is not in a valid region of SRAM

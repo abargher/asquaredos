@@ -15,9 +15,9 @@
 #include "zalloc.h"
 #include "context_switch.h"
 #include "scheduler.h"
+#include "vm.h"
 
 
-#define KB 1024
 #define SRAM_SIZE 256 * (KB)
 #define SRAM_START 0x20000000
 
