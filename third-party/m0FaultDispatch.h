@@ -38,11 +38,14 @@ struct CortexPushedRegs {	//when we push regs, we push them in this order. here 
 };
 
 //fault handling code, cause is EXC_m0_CAUSE_, extraData is usually an address. both unused on C-M3
-void faultHandlerWithExcFrame(struct CortexExcFrame *exc, uint32_t cause, uint32_t extraData, struct CortexPushedRegs *pushedRegs);
+void fault_handler_with_exception_frame(struct CortexExcFrame *exc, uint32_t cause, uint32_t extraData, struct CortexPushedRegs *pushedRegs);
 
 
-/* modification: exporting handler function in header. */
+/* A2OS modification: exporting handler function. */
 void HardFault_Handler(void);
+
+/* A2OS modification: exporting logging function. */
+void m0_fault_dump_registers_and_halt(struct CortexExcFrame *exc, uint32_t cause, uint32_t extraData, struct CortexPushedRegs *pushedRegs);
 
 
 #endif
