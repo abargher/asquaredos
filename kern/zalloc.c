@@ -1,7 +1,6 @@
 #include "zalloc.h"
 #include "scheduler.h"
 #include "utils/list.h"
-#include "utils/panic.h"
 #include <string.h>
 
 /*

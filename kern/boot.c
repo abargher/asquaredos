@@ -10,7 +10,6 @@
 
 #include "boot.h"
 #include "utils/list.h"
-#include "utils/panic.h"
 #include "palloc.h"
 #include "zalloc.h"
 #include "context_switch.h"
@@ -52,46 +51,67 @@ create_system_resources(
     pcb->allocated = NULL;
 
     /*
-     * Allocate a stack.
+     * Allocate and initialize a page table.
      */
-    void *stack = palloc(STACK_SIZE, pcb, PALLOC_FLAGS_ANYWHERE, NULL);
-    assert(stack != NULL);
-    pcb->saved_sp = ((uint32_t)stack + STACK_SIZE) & ~(0b111);   /* Start at TOP of the stack. */
+    pcb->page_table = zalloc(KZONE_PTE_GROUP_TABLE);
+    assert(pcb->page_table != NULL);
+    for (int i = 0; i < GROUP_SIZE; i++) {
+        pcb->page_table->groups[i] = PTE_GROUP_INVALID;
+    }
 
     /*
-     * Allocate space for the program's execution state ("binary") in memory.
+     * Load the program's binary into memory. We'll evict any overlapped pages,
+     * copy in the binary, and then allocate and configure the corresponding
+     * PTEs.
      */
-    void *out = palloc(load_size, pcb, PALLOC_FLAGS_FIXED, load_to);
-    assert(out == load_to);
-    memcpy(load_to, load_from, load_size);
+    for (unsigned int i = 0; i <= load_size / PAGE_SIZE; i++) {
+        vm_map_generic_flash_page(
+            pcb->page_table,
+            load_from + i * PAGE_SIZE,
+            load_to + i * PAGE_SIZE);
+    }
+
+    /*
+     * Stack begins at the top of memory.
+     */
+    pcb->saved_sp = (register_t)VM_END;
 
     /*
      * Align stack pointer correctly to pop our initial saved registers.
      */
     pcb->saved_sp -= sizeof(stack_registers_t);
 
-    /*
-     * Resume execution at the beginning of the binary.
+    /* XXX TODO XXX
+     *
+     * We need to write to a location in the program's address space in order to
+     * initialize their stack. This means setting up PTEs that map to some
+     * place that has the initial values for the stack.
+     *
+     * XXX TODO XXX
+     * 
+     * Also a note: what happens when we return from the schedule handler
+     *              exception, and the hardware tries to pop registers from
+     *              the user's stack? Unless we change something, the stack
+     *              won't be paged in yet, so a hardfault is going to occur,
+     *              (probably..? unless the pop occurs in handler mode?) which
+     *              will result in the data being read in and us attempting to
+     *              re-execute the saved PC-2, but this may not be well defined,
+     *              and it may not be so trivial to recover from a hardfault
+     *              that occurs in the middle of a hardware register restore.
+     * 
+     *              A potential solution here is to always page in the stack of
+     *              the to-be-scheduled program when a context switch occurs. Or
+     *              at least all of the stack that's above the stack pointer.
+     *              --> This is probably what we should do.
      */
 
+    /*
+     * Configure the initial register values.
+     */
     stack_registers_t *stack_registers = (stack_registers_t *)pcb->saved_sp;
-
-    /* Set some stack register values for easy recognition. */
-    memset(stack_registers, 0xeeeeeeee, sizeof(stack_registers_t));
-    stack_registers->r8 = (register_t)(0x88888888);
-    stack_registers->r5 = (register_t)(0x55555555);
-
+    memset(stack_registers, 0, sizeof(stack_registers_t));
     stack_registers->pc = (register_t)(exec_from)| 1;
-    stack_registers->r0 = 0x00000000;
-    stack_registers->r1 = 0x11111111;
-    stack_registers->r2 = 0x22222222;
-    stack_registers->r3 = 0x33333333;
-
-    stack_registers->r12 = 0x12121212;
-    stack_registers->lr = 0xdeadbeef;
-
-    /* TODO: figure out a (more) correct value for PSR for userprograms. */
-    stack_registers->psr = 0x61000000;
+    stack_registers->psr = 0x61000000; /* TODO: figure out a (more) correct value for PSR for userprograms. */
 
     /*
      * Make this PCB schedulable.
@@ -122,6 +142,11 @@ main(void)
     kzone_pcb = zalloc(KZONE_PCB);
     assert(kzone_pcb != NULL);
     pcb_active = kzone_pcb;
+
+    /*
+     * Initialize the VM system.
+     */
+    vm_init();
 
     /* TODO: possibly make a "phony" kernel PCB for as the active PCB to
      * bootstrap scheduler.

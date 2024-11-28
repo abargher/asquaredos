@@ -68,7 +68,7 @@ typedef struct stack_registers stack_registers_t;
 typedef struct process_control_block {
     register_t          saved_sp;       /* Saved stack pointer to recover other registers. */
     heap_region_t      *allocated;      /* List of allocated heap regions. */
-    pte_group_table_t   page_table;     /* Base of the process' page table. */
+    pte_group_table_t  *page_table;     /* Base of the process' page table. */
 
     /*
      * Queue management fields.

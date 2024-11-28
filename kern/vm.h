@@ -20,14 +20,14 @@
  *      [    group:6    ] [ index:4 ] [    page offset:8    ]
  */
 
-#define GROUP_BITS  6
-#define INDEX_BITS  4
-#define OFFSET_BITS 8
+#define GROUP_BITS  (6)
+#define INDEX_BITS  (4)
+#define OFFSET_BITS (8)
 
-#define PAGE_NUMBER_MASK    0x3FF
-#define GROUP_MASK          0x3F
-#define INDEX_MASK          0x0F
-#define OFFSET_MASK         0xFF
+#define PAGE_NUMBER_MASK    (0x3FF)
+#define GROUP_MASK          (0x3F)
+#define INDEX_MASK          (0x0F)
+#define OFFSET_MASK         (0xFF)
 
 #define PAGE_SIZE (1 << OFFSET_BITS)
 
@@ -38,6 +38,14 @@
 #define WRITE_CACHE_INDEX_BITS (WRITE_CACHE_BITS - OFFSET_BITS)
 #define WRITE_CACHE_SIZE (1 << WRITE_CACHE_BITS)
 #define WRITE_CACHE_NUM_ENTRIES (WRITE_CACHE_SIZE / PAGE_SIZE)
+
+/*
+ * Entire flash layout. We will allow special PTEs to be created that map from
+ * a non-swap region of flash into SRAM, which means we need additional bit(s)
+ * for the flash PTE index.
+ */
+#define FLASH_BASE (XIP_BASE)
+#define FLASH_BITS (13)
 
 /*
  * Flash swap region layout.
@@ -59,10 +67,18 @@
  */
 
 /*
+ * User-accessible memory starts after kernel .bss section ends, and continues
+ * until the end of last 32KB SRAM bank.
+ */
+extern char __bss_end__;
+#define VM_START ((void *)(((uintptr_t)&__bss_end__ | 0x1000) & ~(0xFFF))) /* 4KB-aligned. */
+#define VM_END ((void *)SRAM_STRIPED_END)
+
+/*
  * Process identifier. Valid values are 1-15, inclusive. Used by the address to
  * process conversion map.
  */
-#define MAX_PROCESSES   16
+#define MAX_PROCESSES   (16)
 #define PID_INVALID     ((pid_t)0)  /* Used to indicate page has no owner. */
 #define PID_MIN         ((pid_t)1)
 #define PID_MAX         ((pid_t)(MAX_PROCESSES - 1))
@@ -87,7 +103,7 @@ typedef unsigned short page_number_t;
 /*
  * Convert a page_number_t to the address of the page it represents in memory.
  */
-#define SRAM_PAGE(page_number) (SRAM_BASE + 256 * page_number)
+#define SRAM_PAGE(page_number) (SRAM_BASE + 256 * (page_number))
 
 /*
  * Page table entry for a 256B page stored in SRAM.
@@ -110,7 +126,7 @@ typedef unsigned char cache_index_t;
 /*
  * Convert a cache_index_t to the address of the page it represents.
  */
-#define CACHE_PAGE(cache_index) (write_cache + 256 * cache_index)
+#define CACHE_PAGE(cache_index) (write_cache + 256 * (cache_index))
 
 /*
  * Page table entry for a 256B page stored in the write cache.
@@ -139,13 +155,15 @@ typedef unsigned short flash_index_t;
  * Convert a flash_index_t to the memory mapped address of the page in flash
  * that it represents.
  */
-#define FLASH_PAGE(flash_index) (FLASH_SWAP_BASE + 256 * flash_index)
+#define FLASH_PAGE(flash_index) (FLASH_BASE + 256 * (flash_index))
+#define FLASH_INDEX(page) ((((uintptr_t)page) - FLASH_BASE) / PAGE_SIZE)
+#define FLASH_INDEX_FROM_SWAP_INDEX(swap_index) ((swap_index) | (1 << FLASH_BITS))
 
 /*
  * Convert a flash_index_t to the byte offset into flash of the page that it
  * represents.
  */
-#define FLASH_OFFSET(flash_index) (FLASH_SWAP_BASE_FLASH_OFS + 256 * flash_index)
+#define FLASH_OFFSET(flash_index) (256 * (flash_index))
 
 /*
  * Page table entry for a 256B page stored in flash.
@@ -159,8 +177,8 @@ typedef unsigned short flash_index_t;
  */
 struct flash_pte {                  /* 16 bits. */
     unsigned short _reserved    :2;
-    unsigned short _unused      :2;
-    unsigned short flash_index  :FLASH_SWAP_BITS;
+    unsigned short _unused      :1;
+    unsigned short flash_index  :FLASH_BITS;
 } __attribute__((packed));
 
 typedef union {                     /* 16 bits. */
@@ -179,17 +197,19 @@ typedef union {                     /* 16 bits. */
 #define MPU_REGION_SIZE (1 << MPU_REGION_BITS)          /* 32KB. */
 #define MPU_SUBREGION_SIZE (1 << MPU_SUBREGION_BITS)    /* 4KB. */
 
-#define MPU_REGION_BASE(addr) (typeof(addr))(((unsigned)addr >> MPU_REGION_BITS) << MPU_REGION_BITS)
-#define MPU_SUBREGION_BASE(addr) (typeof(addr))(((unsigned)addr >> MPU_SUBREGION_BITS) << MPU_SUBREGION_BITS)
+#define MPU_REGION_BASE(addr) (typeof(addr))(((unsigned)(addr) >> MPU_REGION_BITS) << MPU_REGION_BITS)
+#define MPU_SUBREGION_BASE(addr) (typeof(addr))(((unsigned)(addr) >> MPU_SUBREGION_BITS) << MPU_SUBREGION_BITS)
 
 /*
  * The GROUP, INDEX, and OFFSET macros all assume that the address has already
  * been verified as in-range as an SRAM address.
  */
-#define PAGE_NUMBER(addr)   (((unsigned)addr >> OFFSET_BITS) & PAGE_NUMBER_MASK)
-#define GROUP(addr)         (((unsigned)addr >> (OFFSET_BITS + INDEX_BITS) & GROUP_MASK))
-#define INDEX(addr)         (((unsigned)addr >> OFFSET_BITS) & INDEX_MASK)
-#define OFFSET(addr)        ((unsigned)addr & OFFSET_MASK)
+#define PAGE_NUMBER(addr)   (((unsigned)(addr) >> OFFSET_BITS) & PAGE_NUMBER_MASK)
+#define GROUP(addr)         (((unsigned)(addr) >> (OFFSET_BITS + INDEX_BITS) & GROUP_MASK))
+#define INDEX(addr)         (((unsigned)(addr) >> OFFSET_BITS) & INDEX_MASK)
+#define OFFSET(addr)        ((unsigned)(addr) & OFFSET_MASK)
+
+#define GROUP_INDEX(addr) (((addr) - pte_groups_base) / sizeof(pte_group_t))
 
 /*
  * A single 256 byte page. Can be present in SRAM, write cache, or flash.
@@ -221,5 +241,14 @@ typedef unsigned char pte_group_index_t;
 typedef struct {
     pte_group_index_t groups[N_GROUPS];
 } pte_group_table_t;
+
+#define PID_FROM_GROUP_TABLE(group_table_ptr) (((group_table_ptr) - pte_group_tables_base) / sizeof(pte_group_table_t))
+
+/*
+ * Exported functions.
+ */
+
+void vm_init(void);
+void vm_map_generic_flash_page(pte_group_table_t *pt, page_t *src, page_t *dst);
 
 #endif /* __VM_H__ */

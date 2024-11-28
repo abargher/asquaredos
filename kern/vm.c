@@ -95,21 +95,15 @@ bitmap_find_and_set_first_zero(
 }
 
 /*
- * User-accessible memory starts after kernel .bss section ends, and continues
- * until the end of last 32KB SRAM bank.
- */
-extern char __bss_end__;
-#define VM_START ((void *)&__bss_end__)
-#define VM_END ((void *)SRAM_STRIPED_END)
-
-/*
  * Walk the page table to find the PTE corresponding with the given address.
  * Returns NULL if no PTE has been allocated for that address.
  * 
  * TODO: should this function should be inlined for performance?
  */
 pte_t *
-address_to_pte(pte_group_table_t *pt, void *addr)
+address_to_pte(
+    pte_group_table_t  *pt,
+    void               *addr)
 {
     pte_group_index_t group_index = pt->groups[GROUP(addr)];
     pte_group_t *pte_group = &pte_groups_base[group_index];
@@ -163,7 +157,7 @@ vm_procure_flash_page(void)
         page_bitmap_start_at);
     if (page_index != BITMAP_OPERATION_FAILED) {
         page_bitmap_start_at = page_index + 1;
-        return (flash_index_t)page_index;
+        return FLASH_INDEX_FROM_SWAP_INDEX(page_index);
     }
     
     /*
@@ -210,7 +204,7 @@ vm_procure_flash_page(void)
          * TODO: I (with fresh eyes)--or someone else--should sanity-check that
          * the math makes sense to be the first page in the newly erased sector.
          */
-        return page_index;
+        return FLASH_INDEX_FROM_SWAP_INDEX(page_index);
     }
 
     /*
@@ -373,8 +367,7 @@ vm_evict_sram_page(page_t *page)
     pte_t *pte = address_to_pte(pt, page);
     if (pte == NULL || pte->type == PTE_INVALID) {
         /*
-         * This shouldn't happen, but it should be equivalent to the earlier
-         * case of no one owning the page.
+         * Equivalent to the earlier case of no one owning the page.
          */
         return;
     }
@@ -451,7 +444,9 @@ vm_evict_sram_page(page_t *page)
  *          --> perhaps a special bit set for the flash pte type or something?
  */
 void
-vm_read_in_subregion(pte_group_table_t *pt, void *subregion)
+vm_read_in_subregion(
+    pte_group_table_t  *pt,
+    void               *subregion)
 {
     /*
      * Check if PTEs exist to map this subregion. If not, we need to allocate
@@ -476,7 +471,7 @@ vm_read_in_subregion(pte_group_table_t *pt, void *subregion)
             pte->type = PTE_SRAM;
             pte->sram.page_number = PAGE_NUMBER(subregion) + i;
         }
-        pt->groups[GROUP(subregion)] = (pte_group - pte_groups_base) / sizeof(pte_group_t);
+        pt->groups[GROUP(subregion)] = GROUP_INDEX(pte_group);
 
         /*
          * Is the memset necessary? Not sure what the performance hit is, but it
@@ -506,6 +501,54 @@ mpu_enable_subregion(void *subregion)
 }
 
 /*
+ * Create a non-swap flash PTE mapping from the source page (in flash) to the
+ * destination page (in SRAM). Caller assumes the responsibility of making sure
+ * the source page is sane.
+ * 
+ * Note that pages back by flash are never directtly written back to the source
+ * page in flash when dirtied; pages mapped from outside of the swap region are
+ * thus treated as read-only by the VM system.
+ */
+void
+vm_map_generic_flash_page(
+    pte_group_table_t  *pt,
+    page_t             *src,
+    page_t             *dst)
+{
+    /*
+     * If a PTE doesn't already exist for this page, allocate it right now.
+     */
+    pte_group_index_t index = GROUP(dst);
+    if (pt->groups[index] == PTE_GROUP_INVALID) {
+        pte_group_t *group = zalloc(KZONE_PTE_GROUP);
+        if (group == NULL) {
+            panic("failed to allocate pte_group_t");
+        }
+        pt->groups[index] = GROUP_INDEX(group);
+
+        /*
+         * Note the zalloc will zero the PTE group, marking them as invalid.
+         */
+    }
+
+    /*
+     * Point this PTE at the source page.
+     */
+    pte_t *pte = address_to_pte(pt, dst);
+    pte->type = PTE_FLASH;
+    pte->flash.flash_index = FLASH_INDEX(src);
+}
+
+/*
+ * Initialize all global state used by the VM system.
+ */
+void
+vm_init(void)
+{
+    /* TODO. */
+}
+
+/*
  * This fault handler will replace the hardfault handler, and will fall through
  * to that handler if the faulting address is not in a valid region of SRAM
  * (at least for now, until we determine a reasonable way to kill a process.)
@@ -530,13 +573,20 @@ vm_fault_handler(void *addr)
      * otherwise.
      */
 
+
     /*
-     * Iterate through each page contained in the MPU subregion and evict it.
+     * Iterate through each page contained in the MPU subregion and evict it,
+     * unless it's already owned by the active process.
      */
+    pid_t pid_active = PID_FROM_GROUP_TABLE(pcb_active->page_table);
     void *subregion_base = MPU_SUBREGION_BASE(addr);
     for (unsigned offset = 0; offset < MPU_SUBREGION_SIZE; offset += PAGE_SIZE) {
         page_t *page = subregion_base + offset;
-        vm_evict_sram_page(page);
+        pid_t *pid = &sram_page_owner_table[PAGE_NUMBER(page)];
+        if (*pid != pid_active) {
+            vm_evict_sram_page(page);
+            *pid = pid_active;
+        }
     }
 
     /*
@@ -544,7 +594,7 @@ vm_fault_handler(void *addr)
      * or otherwise allocate and initialize that portion of the page table if
      * it does not exist.
      */
-    vm_read_in_subregion(&pcb_active->page_table, subregion_base);
+    vm_read_in_subregion(pcb_active->page_table, subregion_base);
     mpu_enable_subregion(subregion_base); /* TODO. */
 
     /*
