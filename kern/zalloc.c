@@ -28,8 +28,8 @@ pte_group_table_t   zone_pte_group_tables[PTE_GROUP_TABLE_ZONE_ELEMS];
  * Export the base of the pte_group_t and pte_group_table_t zones. They are
  * required for looking up a PTE from an address.
  */
-const pte_group_t          *pte_groups_base         = zone_pte_groups;
-const pte_group_table_t    *pte_group_tables_base   = zone_pte_group_tables;
+pte_group_t        *pte_groups_base         = zone_pte_groups;
+pte_group_table_t  *pte_group_tables_base   = zone_pte_group_tables;
 
 
 /*
