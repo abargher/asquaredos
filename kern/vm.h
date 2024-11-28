@@ -96,12 +96,11 @@ typedef unsigned short page_number_t;
  * neither a cache/flash PTE may be promoted to SRAM PTE. Only demotion from
  * SRAM to cache/flash is allowable.
  */
-__attribute__((packed))
 struct sram_pte {                   /* 16 bits. */
     unsigned short _reserved    :2;
     unsigned short _unused      :4;
     page_number_t  page_number  :10;
-};
+} __attribute__((packed));
 
 /*
  * Index of a page in the write cache.
@@ -159,20 +158,18 @@ typedef unsigned short flash_index_t;
  * procured, the contents of the page in SRAM will be written to it, and this
  * PTE will be promoted to PTE_CACHE.
  */
-__attribute__((packed))
 struct flash_pte {                  /* 16 bits. */
     unsigned short _reserved    :2;
     unsigned short _unused      :2;
     unsigned short flash_index  :FLASH_SWAP_BITS;
-};
+} __attribute__((packed));
 
-__attribute__((packed))
 typedef union {                     /* 16 bits. */
     pte_type_t          type:2;
     struct sram_pte     sram;
     struct cache_pte    cache;
     struct flash_pte    flash;
-} pte_t;
+} __attribute__((packed)) pte_t;
 
 /*
  * MPU region details.
