@@ -14,8 +14,8 @@
  * Export the page table zones, since they're required for looking up page
  * table entries from an address.
  */
-extern const pte_group_t           *pte_groups_base;
-extern const pte_group_table_t     *pte_group_tables_base;
+extern pte_group_t         *pte_groups_base;
+extern pte_group_table_t   *pte_group_tables_base;
 
 /*
  * Kernel zone allocator zone index.

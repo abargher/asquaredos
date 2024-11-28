@@ -105,8 +105,8 @@ get_faulting_address(void)
  * until the end of last 32KB SRAM bank.
  */
 extern char __bss_end__;
-#define VM_START (&__bss_end__)
-#define VM_END (SRAM_STRIPED_END)
+#define VM_START ((void *)&__bss_end__)
+#define VM_END ((void *)SRAM_STRIPED_END)
 
 /*
  * Walk the page table to find the PTE corresponding with the given address.
@@ -127,7 +127,27 @@ address_to_pte(pte_group_table_t *pt, void *addr)
         return NULL;
     }
 
-    return &pte_group[INDEX(addr)];
+    return &pte_group->ptes[INDEX(addr)];
+}
+
+/*
+ * Return a READ-ONLY pointer to the content pointed to by a PTE.
+ */
+static inline page_t *
+vm_get_page_contents(pte_t *pte)
+{
+    switch (pte->type) {
+        case PTE_INVALID:
+            return NULL;
+        case PTE_SRAM:
+            return (page_t *)SRAM_PAGE(pte->sram.page_number);
+        case PTE_CACHE:
+            return (page_t *)CACHE_PAGE(pte->cache.cache_index);
+        case PTE_FLASH:
+            return (page_t *)FLASH_PAGE(pte->flash.flash_index);
+        default:
+            panic("PTE has unknown type; should not be possible");
+    }
 }
 
 /*
@@ -228,7 +248,7 @@ vm_evict_cache_entry(pte_t *pte)
      */
     flash_range_program(
         FLASH_OFFSET(flash_index),
-        vm_get_page_contents(pte),
+        (uint8_t *)vm_get_page_contents(pte),
         PAGE_SIZE);
     
     /*
@@ -275,6 +295,7 @@ vm_find_cache_victim(void)
          * Find who owns the 
          */
         pid_t owner = write_cache_entry_owner_table[index];
+        pte_group_table_t *pt = &pte_group_tables_base[owner];
         if (owner == PID_INVALID) {
             /*
              * If no-one owns this page (this should not happen, since we should
@@ -282,13 +303,12 @@ vm_find_cache_victim(void)
              * use this page and make sure it's marked in the bitmap.
              */
             write_cache_bitmap[index / 8] |= (1 << index % 8);
-            return index++;
+            return address_to_pte(pt, CACHE_PAGE(index++));
         }
-        pte_group_table_t *pt = &pte_group_tables_base[owner];
         pte_t *pte = address_to_pte(pt, CACHE_PAGE(index));
 
         if (pte->cache.dirty == 0) {
-            return index++;
+            return pte;
         }
 
         /*
@@ -329,26 +349,6 @@ vm_procure_cache_entry(void)
     vm_evict_cache_entry(victim);
 
     return entry;
-}
-
-/*
- * Return a READ-ONLY pointer to the content pointed to by a PTE.
- */
-static inline page_t *
-vm_get_page_contents(pte_t *pte)
-{
-    switch (pte->type) {
-        case PTE_INVALID:
-            return NULL;
-        case PTE_SRAM:
-            return SRAM_PAGE(pte->sram.page_number);
-        case PTE_CACHE:
-            return CACHE_PAGE(pte->cache.cache_index);
-        case PTE_FLASH:
-            return FLASH_PAGE(pte->flash.flash_index);
-        default:
-            panic("PTE has unknown type; should not be possible");
-    }
 }
 
 /*
@@ -454,11 +454,55 @@ vm_evict_sram_page(page_t *page)
  * the subregion in SRAM are correct upon function return.
  * 
  * TODO: implement a simple optimization to prevent us swapping out zeroes.
+ *          --> perhaps a special bit set for the flash pte type or something?
  */
 void
 vm_read_in_subregion(pte_group_table_t *pt, void *subregion)
 {
-    /* TODO. */
+    /*
+     * Check if PTEs exist to map this subregion. If not, we need to allocate
+     * and configure them, since this is the first time this processes will have
+     * accessed an address in this MPU subregion.
+     */
+    if (pt->groups[GROUP(subregion)] == NULL) { /* TODO FIX ME THIS IS BROKEN. HOW TO INDICATE ERROR? */
+        /*
+         * Allocate a new PTE group.
+         */
+        pte_group_t *pte_group = zalloc(KZONE_PTE_GROUP);
+        if (pte_group == NULL) {
+            panic("failed to allocate PTE group; zone exhausted");
+        }
+
+        /*
+         * Initialize the PTEs as pointing to the page they represent in SRAM,
+         * and register the PTE group.
+         */
+        for (int i = 0; i < GROUP_SIZE; i++) {
+            pte_t *pte = &pte_group->ptes[i];
+            pte->type = PTE_SRAM;
+            pte->sram.page_number = PAGE_NUMBER(subregion) + i;
+        }
+        pt->groups[GROUP(subregion)] = (pte_group - pte_groups_base) / sizeof(pte_group_t);
+
+        /*
+         * Is the memset necessary? Not sure what the performance hit is, but it
+         * means memory contents won't be leaked between processes.
+         */
+        memset(subregion, 0, MPU_SUBREGION_SIZE);
+
+        return;
+    }
+
+    /*
+     * PTEs already exist to map these pages, which means we can just copy in
+     * the content pointed to by those PTEs.
+     */
+    for (page_t *page = subregion;
+         (uintptr_t)page < (uintptr_t)(subregion + MPU_REGION_SIZE);
+         page++) {
+        pte_t *pte = address_to_pte(pt, page);
+        memcpy(page, vm_get_page_contents(pte), PAGE_SIZE);
+    }
 }
 
 /*
@@ -500,11 +544,20 @@ vm_fault_handler(void)
      * or otherwise allocate and initialize that portion of the page table if
      * it does not exist.
      */
-    vm_read_in_subregion(&pcb_active->page_table, subregion_base); /* TODO. */
+    vm_read_in_subregion(&pcb_active->page_table, subregion_base);
     mpu_enable_subregion(subregion_base); /* TODO. */
 
     /*
      * Re-try the instruction that triggered the fault (TODO).
+     *
+     *      --> I think we need to pop the saved PC from the program's stack,
+     *          subtract 2 bytes, and push it back on.
      */
-    /* TODO. */
+
+    /*
+     * Return from the fault.
+     *
+     * TODO: is this the right way to return from the fault?
+     */
+    asm("pop {r3, pc}");    /* r3 should be padding, PC should get 0xfffffffd. */
 }
