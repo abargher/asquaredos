@@ -7,6 +7,7 @@
 
 #ifndef __PANIC_H__
 #define __PANIC_H__
+#include "pico/stdlib.h"
 
 #define LED_BUILTIN 25
 
@@ -16,10 +17,11 @@
  */
 #define panic()                                                                \
     do {                                                                       \
-        gpio_put(LED_BUILTIN, 1);   /* Illuminate the LED. */                  \
-        asm("bkpt #0");             /* Put us in debug mode. */                \
+        /* gpio_put(LED_BUILTIN, 1);   Illuminate the LED. */                  \
+        /* asm("bkpt #0");             Put us in debug mode. */                \
     } while (0)
 
+#undef assert
 #define assert(condition)                                                      \
     do {                                                                       \
         if (condition) {                                                       \
