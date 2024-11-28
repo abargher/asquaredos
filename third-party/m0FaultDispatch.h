@@ -1,3 +1,11 @@
+/*
+
+https://dmitry.gr/?r=05.Projects&proj=27.%20m0FaultDispatch
+
+The license is simple: This code is free for use in hobby and other non-commercial products.
+For commercial use, contact me@dmitry.gr
+
+*/
 #ifndef _M0_FAULT_DISPATCH_
 #define _M0_FAULT_DISPATCH_
 
@@ -33,6 +41,8 @@ struct CortexPushedRegs {	//when we push regs, we push them in this order. here 
 void faultHandlerWithExcFrame(struct CortexExcFrame *exc, uint32_t cause, uint32_t extraData, struct CortexPushedRegs *pushedRegs);
 
 
+/* modification: exporting handler function in header. */
+void HardFault_Handler(void);
 
 
 #endif

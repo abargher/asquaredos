@@ -31,6 +31,8 @@ int main() {
   gpio_init(2);
   gpio_set_dir(2, GPIO_OUT);
 
+  ((void (*)(void))0x60000001)();
+
   // Main Loop
   while (1) {
     gpio_put(2, 1);  // Set pin 2 to high

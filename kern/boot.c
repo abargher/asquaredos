@@ -16,6 +16,7 @@
 #include "context_switch.h"
 #include "scheduler.h"
 #include "vm.h"
+#include "third-party/m0FaultDispatch.h"
 
 
 #define SRAM_SIZE 256 * (KB)
@@ -109,6 +110,7 @@ create_system_resources(
 int
 main(void)
 {
+    stdio_init_all();
     /*
      * Initialize the zone allocator.
      */
@@ -142,7 +144,7 @@ main(void)
      * entrypoint, discovered by reading the symbol tables in their .elf files.
      * Each program is given 60KB of space (more than enough).
      */
-    create_system_resources((void *)0x10020000, (void *)0x20020000, (void *)0x20020298, (60 * 1024));
+    // create_system_resources((void *)0x10020000, (void *)0x20020000, (void *)0x20020298, (60 * 1024));
     create_system_resources((void *)0x10010000, (void *)0x20010000, (void *)0x20010298, (60 * 1024));
 
     /* Unify our stack pointers */
@@ -150,6 +152,7 @@ main(void)
     asm("msr psp, r0");
     asm("isb");
 
+    exception_set_exclusive_handler(HARDFAULT_EXCEPTION, HardFault_Handler);
 
     /* Register the schedule_handler as the timer interrupt handler. A voluntary
      * "yield" call could be implemented by using the `svc` instruction and
@@ -157,14 +160,16 @@ main(void)
      * 
      *      exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
      */
-    exception_set_exclusive_handler(SYSTICK_EXCEPTION, schedule_handler);
+    // exception_set_exclusive_handler(SYSTICK_EXCEPTION, schedule_handler);
+    exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
 
     /* Set SYST_RVR timer reset value */
     systick_hw->rvr = 0xffff;  /* TODO: configure this value */
 
     /* Configure and enable SysTick counter */
-    systick_hw->csr = 0x7;
+    // systick_hw->csr = 0x7;
 
     /* Timer interrupt will deschedule this process and never reschedule it. */
+    asm("svc #0");
     while (1) {}
 }

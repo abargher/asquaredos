@@ -1,8 +1,12 @@
+#include <string.h>
+#include <stdio.h>
+
+#include <hardware/flash.h>
+
 #include "vm.h"
 #include "zalloc.h"
 #include "resources.h"
-#include <hardware/flash.h>
-#include <string.h>
+#include "third-party/m0FaultDispatch.h"
 
 /*
  * Table maps from page number (GROUP and INDEX bits) to PID.
@@ -566,4 +570,85 @@ vm_fault_handler(void)
      * TODO: is this the right way to return from the fault?
      */
     asm("pop {r3, pc}");    /* r3 should be padding, PC should get 0xfffffffd. */
+}
+
+void
+faultHandlerWithExcFrame(
+    struct CortexExcFrame *exc,
+    uint32_t reason,
+    uint32_t addr,
+    struct CortexPushedRegs *hiRegs)
+{
+    /* TODO: replace with our own, simpler implementation.
+     * Current implementation borrowed from example in Dmitry's code.
+     */
+
+    static const char *names[] = {
+		[EXC_m0_CAUSE_MEM_READ_ACCESS_FAIL] = "Memory read failed",
+		[EXC_m0_CAUSE_MEM_WRITE_ACCESS_FAIL] = "Memory write failed",
+		[EXC_m0_CAUSE_DATA_UNALIGNED] = "Data alignment fault",
+		[EXC_m0_CAUSE_UNDEFINSTR16] = "Undef Instr16",
+		[EXC_m0_CAUSE_UNDEFINSTR32] = "Undef Instr32",
+		[EXC_m0_CAUSE_BKPT_HIT] = "Breakpoint hit",
+		[EXC_m0_CAUSE_BAD_CPU_MODE] = "ARM mode entered",
+		[EXC_m0_CAUSE_CLASSIFIER_ERROR] = "Unclassified fault",
+	};
+	uint32_t i;
+	
+	printf("%s sr = 0x%08x\n", (reason < sizeof(names) / sizeof(*names) && names[reason]) ? names[reason] : "????", exc->sr);
+	printf("R0  = 0x%08x  R8  = 0x%08x\n", exc->r0_r3[0], hiRegs->regs8_11[0]);
+	printf("R1  = 0x%08x  R9  = 0x%08x\n", exc->r0_r3[1], hiRegs->regs8_11[1]);
+	printf("R2  = 0x%08x  R10 = 0x%08x\n", exc->r0_r3[2], hiRegs->regs8_11[2]);
+	printf("R3  = 0x%08x  R11 = 0x%08x\n", exc->r0_r3[3], hiRegs->regs8_11[3]);
+	printf("R4  = 0x%08x  R12 = 0x%08x\n", hiRegs->regs4_7[0], exc->r12);
+	printf("R5  = 0x%08x  SP  = 0x%08x\n", hiRegs->regs4_7[1], (exc + 1));
+	printf("R6  = 0x%08x  LR  = 0x%08x\n", hiRegs->regs4_7[2], exc->lr);
+	printf("R7  = 0x%08x  PC  = 0x%08x\n", hiRegs->regs4_7[3], exc->pc);
+	
+	switch (reason) {
+		case EXC_m0_CAUSE_MEM_READ_ACCESS_FAIL:
+			printf(" -> failed to read 0x%08x\n", addr);
+			break;
+		case EXC_m0_CAUSE_MEM_WRITE_ACCESS_FAIL:
+			printf(" -> failed to write 0x%08x\n", addr);
+			break;
+		case EXC_m0_CAUSE_DATA_UNALIGNED:
+			printf(" -> unaligned access to 0x%08x\n", addr);
+			break;
+		case EXC_m0_CAUSE_UNDEFINSTR16:
+			printf(" -> undef instr: 0x%04x\n", ((uint16_t*)exc->pc)[0]);
+			break;
+		case EXC_m0_CAUSE_UNDEFINSTR32:
+			printf(" -> undef instr32: 0x%04x 0x%04x\n", ((uint16_t*)exc->pc)[0], ((uint16_t*)exc->pc)[1]);
+			
+			// //emulate UDIV
+			// if ((((uint16_t*)exc->pc)[0] & 0xfff0) == 0xfbb0 && (((uint16_t*)exc->pc)[1] & 0xf0f0) == 0xf0f0) {
+				
+			// 	uint32_t rmNo = ((uint16_t*)exc->pc)[1] & 0x0f;
+			// 	uint32_t rnNo = ((uint16_t*)exc->pc)[0] & 0x0f;
+			// 	uint32_t rdNo = (((uint16_t*)exc->pc)[1] >> 8) & 0x0f;
+				
+			// 	//PC and SP are forbidden. this is the fastest way to test for that!
+			// 	if (((1 << rmNo) | (1 << rnNo) | (1 << rdNo)) & ((1 << 13) | (1 << 15)))
+			// 		printf("invalid UDIV instr seen. Rd=%d, Rn=%d, Rm=%d\n", rdNo, rnNo, rmNo);
+			// 	else {
+					
+			// 		uint32_t rmVal = getReg(exc, hiRegs, rmNo);
+			// 		uint32_t ret = rmVal ? (getReg(exc, hiRegs, rnNo) / rmVal) : 0;
+					
+			// 		//set result in the reg instr wqas supposed to write
+			// 		setReg(exc, hiRegs, rdNo, ret);
+					
+			// 		//skip the instr since we emulated it
+			// 		exc->pc += 4;
+					
+			// 		return;
+			// 	}
+			// }
+			
+			break;
+	}
+	
+	while(1);
+
 }

@@ -1,3 +1,11 @@
+/*
+
+https://dmitry.gr/?r=05.Projects&proj=27.%20m0FaultDispatch
+
+The license is simple: This code is free for use in hobby and other non-commercial products.
+For commercial use, contact me@dmitry.gr
+
+*/
 #include "m0FaultDispatch.h"
 #include <stdbool.h>
 
