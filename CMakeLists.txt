@@ -39,7 +39,6 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O0")
 
 add_executable(asquaredos 
     kern/boot.c
-    # asquaredos.c
     kern/palloc.c
     kern/zalloc.c
     kern/resources.c
@@ -48,6 +47,8 @@ add_executable(asquaredos
     kern/scheduler.c
 
     kern/context_switch.s
+
+    third-party/m0FaultDispatch.c
 )
 
 pico_set_program_name(asquaredos "asquaredos")
