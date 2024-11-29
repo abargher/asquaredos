@@ -72,20 +72,6 @@ typedef struct {
 volatile mpu_ctrl_t *mpu_ctrl = (mpu_ctrl_t *)&mpu_hw->ctrl;
 
 /*
- * Properly typed memory mapped registers for convenience.
- */
-
-
-/*
- * Used to set the ADDR field of the MPU_RBAR register, since the format of the
- * register is dependent on the size of the corresponding MPU region.
- */
-#define RBAR_SET_ADDR(addr, n)                                                 \
-    do {                                                                       \
-        mpu_rbar->__addr = (addr >> n) << n;                                   \
-    } while (0)
-
-/*
  * Disable all subregions of all MPU regions.
  */
 void
