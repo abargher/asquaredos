@@ -2,6 +2,7 @@
 #include <stdio.h>
 
 #include <hardware/flash.h>
+#include <hardware/exception.h>
 
 #include "vm.h"
 #include "mpu.h"
@@ -540,7 +541,12 @@ vm_map_generic_flash_page(
 void
 vm_init(void)
 {
-    /* TODO. */
+    exception_set_exclusive_handler(HARDFAULT_EXCEPTION, HardFault_Handler);
+
+    /*
+     * Beware all of SRAM will now be inaccessible in thread mode.
+     */
+    mpu_init();
 }
 
 /*
@@ -548,9 +554,8 @@ vm_init(void)
  * to that handler if the faulting address is not in a valid region of SRAM
  * (at least for now, until we determine a reasonable way to kill a process.)
  */
-__attribute__((noreturn))
 void
-vm_fault_handler(void *addr)
+vm_page_fault(pte_group_table_t *pt, void *addr)
 {
     if (addr < VM_START || addr >= VM_END) {
         /* TODO: call original hardfault handler or kill the process... */
@@ -568,12 +573,11 @@ vm_fault_handler(void *addr)
      * otherwise.
      */
 
-
     /*
      * Iterate through each page contained in the MPU subregion and evict it,
      * unless it's already owned by the active process.
      */
-    pid_t pid_active = PID_FROM_GROUP_TABLE(pcb_active->page_table);
+    pid_t pid_active = PID_FROM_GROUP_TABLE(pt);
     void *subregion_base = MPU_SUBREGION_BASE(addr);
     for (unsigned offset = 0; offset < MPU_SUBREGION_SIZE; offset += PAGE_SIZE) {
         page_t *page = subregion_base + offset;
@@ -589,33 +593,19 @@ vm_fault_handler(void *addr)
      * or otherwise allocate and initialize that portion of the page table if
      * it does not exist.
      */
-    vm_read_in_subregion(pcb_active->page_table, subregion_base);
-    mpu_enable_subregion(subregion_base); /* TODO. */
+    vm_read_in_subregion(pt, subregion_base);
+    mpu_enable_subregion(subregion_base);
 
     /*
-     * Re-try the instruction that triggered the fault. Note that this will
-     * fail badly if the fault did not occur while it was in thread mode, and
-     * while it was using the program stack pointer. This should never be the
-     * case if this code is reached, however, since at this point the fault must
-     * have been a read or write fault in the VM-managed range of SRAM, which
-     * would not occur while executing in handler mode, and we never use the MSP
-     * while in thread mode.
+     * This page has now been loaded, and will be accessible when next accessed;
+     * no more VM management needs to occur.
      */
-    asm volatile (
-        ".thumb                     \n\t"
-        ".align 4                   \n\t"
-        "mrs    r0, psp             \n\t"
-        "ldr    r1, [r0, #24]       \n\t"   /* Load saved PC from the program stack. */
-        "sub    r1, #2              \n\t"   /* Decrement PC to point at faulting instruction. */
-        "str    r1, [r0, #24]       \n\t"   /* Save modified PC back to the program stack. */
-        "pop    {r0, pc}            \n\t"   /* Return from the exception. */
-        :
-        :
-        : "memory", "r0", "r1");
-
-    __builtin_unreachable();
 }
 
+/*
+ * TODO: write a descriptive comment for this function.
+ */
+__attribute__((noreturn))
 void
 fault_handler_with_exception_frame(
     struct CortexExcFrame *exc,
@@ -629,17 +619,30 @@ fault_handler_with_exception_frame(
     if (cause == EXC_m0_CAUSE_MEM_READ_ACCESS_FAIL ||
         cause == EXC_m0_CAUSE_MEM_WRITE_ACCESS_FAIL) {
 
-        vm_fault_handler((void *)extra_data);   /* extra_data is the faulting address. */
+        vm_page_fault(pcb_active->page_table, (void *)extra_data);  /* extra_data == faulting address. */
 
         /*
-         * At this point vm_fault_handler has returned, indicating that this
-         * fault cannot be handled by the VM system, and should be treated as
-         * any other unhandled fault.
-         * 
-         * Handled faults will result in vm_fault_handler not returning; the
-         * handler will return from the exception state, loading the PC directly
-         * in order to re-execute the faulting instruction.
+         * Re-try the instruction that triggered the fault. Note that this will
+         * fail badly if the fault did not occur while it was in thread mode, and
+         * while it was using the program stack pointer. This should never be the
+         * case if this code is reached, however, since at this point the fault must
+         * have been a read or write fault in the VM-managed range of SRAM, which
+         * would not occur while executing in handler mode, and we never use the MSP
+         * while in thread mode.
          */
+        asm volatile (
+            ".thumb                     \n\t"
+            ".align 4                   \n\t"
+            "mrs    r0, psp             \n\t"
+            "ldr    r1, [r0, #24]       \n\t"   /* Load saved PC from the program stack. */
+            "sub    r1, #2              \n\t"   /* Decrement PC to point at faulting instruction. */
+            "str    r1, [r0, #24]       \n\t"   /* Save modified PC back to the program stack. */
+            "pop    {r0, pc}            \n\t"   /* Return from the exception. */
+            :
+            :
+            : "memory", "r0", "r1");
+
+        __builtin_unreachable();
     }
     
     /*

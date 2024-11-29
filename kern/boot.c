@@ -81,29 +81,15 @@ create_system_resources(
      */
     pcb->saved_sp -= sizeof(stack_registers_t);
 
-    /* XXX TODO XXX
-     *
-     * We need to write to a location in the program's address space in order to
-     * initialize their stack. This means setting up PTEs that map to some
-     * place that has the initial values for the stack.
-     *
-     * XXX TODO XXX
+    /*
+     * We need to write to this process' stack, which means it needs to be
+     * faulted into SRAM.
      * 
-     * Also a note: what happens when we return from the schedule handler
-     *              exception, and the hardware tries to pop registers from
-     *              the user's stack? Unless we change something, the stack
-     *              won't be paged in yet, so a hardfault is going to occur,
-     *              (probably..? unless the pop occurs in handler mode?) which
-     *              will result in the data being read in and us attempting to
-     *              re-execute the saved PC-2, but this may not be well defined,
-     *              and it may not be so trivial to recover from a hardfault
-     *              that occurs in the middle of a hardware register restore.
-     * 
-     *              A potential solution here is to always page in the stack of
-     *              the to-be-scheduled program when a context switch occurs. Or
-     *              at least all of the stack that's above the stack pointer.
-     *              --> This is probably what we should do.
+     * Note: we only fault in a single page here (which will end up faulting in
+     *       4KB, due to a subregion protecting 8x 256B pages) because we only
+     *       write a trivial (<< 4KB) amount of data to the stack.
      */
+    vm_page_fault(pcb->page_table, (void *)(pcb->saved_sp));
 
     /*
      * Configure the initial register values.
@@ -172,29 +158,19 @@ main(void)
     // create_system_resources((void *)0x10020000, (void *)0x20020000, (void *)0x20020298, (60 * 1024));
     create_system_resources((void *)0x10010000, (void *)0x20010000, (void *)0x20010298, (60 * 1024));
 
-    /* Unify our stack pointers */
-    asm("mrs r0, msp");
-    asm("msr psp, r0");
-    asm("isb");
-
-    exception_set_exclusive_handler(HARDFAULT_EXCEPTION, HardFault_Handler);
-
     /* Register the schedule_handler as the timer interrupt handler. A voluntary
      * "yield" call could be implemented by using the `svc` instruction and
-     * registering the schedule_handler as the SVCALL exception handler:
-     * 
-     *      exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
+     * registering the schedule_handler as the SVCALL exception handler.
      */
-    // exception_set_exclusive_handler(SYSTICK_EXCEPTION, schedule_handler);
+    exception_set_exclusive_handler(SYSTICK_EXCEPTION, schedule_handler);
     exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
 
     /* Set SYST_RVR timer reset value */
-    systick_hw->rvr = 0xffff;  /* TODO: configure this value */
-
+    systick_hw->rvr = 0xffffff;  /* TODO: configure this value */
     /* Configure and enable SysTick counter */
-    // systick_hw->csr = 0x7;
+    systick_hw->csr = 0x7;
 
     /* Timer interrupt will deschedule this process and never reschedule it. */
-    asm("svc #0");
+    // asm("svc #0");
     while (1) {}
 }

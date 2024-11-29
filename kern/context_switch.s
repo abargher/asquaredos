@@ -48,13 +48,14 @@
 .global schedule_handler
 .align 4
 schedule_handler:
-    push    {r3, lr}                @ Save r0-r3, and lr (the saved PC) to the to-be-descheduled process
-    bl      sched_get_next          @ Get the next process to load -- TODO define me
-    ldr     r3, =pcb_active         @ Get the current process
-    ldr     r1, [r3]                @ Dereference pcb_active
-    cmp     r0, r1                  @ Check if next to schedule == pcb_active
-    beq     schedule_handler_return @ If we're scheduling the active process then this is a no-op
-    str     r0, [r3]                @ Store the new next to schedule process at pcb_active
+    push    {r3, lr}                    @ Save r0-r3, and lr (the saved PC) to the to-be-descheduled process
+    bl      sched_get_next              @ Get the next process to load
+    ldr     r3, =pcb_active             @ Get the current process
+    ldr     r1, [r3]                    @ Dereference pcb_active
+    cmp     r0, r1                      @ Check if next to schedule == pcb_active
+    beq     schedule_handler_return     @ If we're scheduling the active process then this is a no-op
+    str     r0, [r3]                    @ Store the new next to schedule process at pcb_active
+    bl      mpu_disable_all_subregions  @ Re-protect all of memory from the new process
     bl      context_switch
 
 .thumb_func

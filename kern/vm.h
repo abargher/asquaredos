@@ -238,5 +238,6 @@ typedef struct {
 
 void vm_init(void);
 void vm_map_generic_flash_page(pte_group_table_t *pt, page_t *src, page_t *dst);
+void vm_page_fault(pte_group_table_t *pt, void *addr);  /* Kernel needs to be able to fault in a process' stack during creation and during a context switch. */
 
 #endif /* __VM_H__ */
