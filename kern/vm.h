@@ -189,18 +189,6 @@ typedef union {                     /* 16 bits. */
 } __attribute__((packed)) pte_t;
 
 /*
- * MPU region details.
- */
-#define MPU_REGION_BITS (15)
-#define MPU_SUBREGION_BITS (MPU_REGION_BITS - 3)        /* 12 bits. */
-
-#define MPU_REGION_SIZE (1 << MPU_REGION_BITS)          /* 32KB. */
-#define MPU_SUBREGION_SIZE (1 << MPU_SUBREGION_BITS)    /* 4KB. */
-
-#define MPU_REGION_BASE(addr) (typeof(addr))(((unsigned)(addr) >> MPU_REGION_BITS) << MPU_REGION_BITS)
-#define MPU_SUBREGION_BASE(addr) (typeof(addr))(((unsigned)(addr) >> MPU_SUBREGION_BITS) << MPU_SUBREGION_BITS)
-
-/*
  * The GROUP, INDEX, and OFFSET macros all assume that the address has already
  * been verified as in-range as an SRAM address.
  */

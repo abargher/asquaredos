@@ -43,6 +43,7 @@ add_executable(asquaredos
     kern/palloc.c
     kern/zalloc.c
     kern/resources.c
+    kern/mpu.c
     kern/vm.c
 
     kern/scheduler.c

@@ -4,6 +4,7 @@
 #include <hardware/flash.h>
 
 #include "vm.h"
+#include "mpu.h"
 #include "zalloc.h"
 #include "resources.h"
 #include "third-party/m0FaultDispatch.h"
@@ -492,12 +493,6 @@ vm_read_in_subregion(
         pte_t *pte = address_to_pte(pt, page);
         memcpy(page, vm_get_page_contents(pte), PAGE_SIZE);
     }
-}
-
-void
-mpu_enable_subregion(void *subregion)
-{
-    /* TODO: define me. */
 }
 
 /*
