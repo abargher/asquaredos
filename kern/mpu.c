@@ -23,11 +23,11 @@
  * Thank you GCC.
  */
 #define MPU_FRIENDLY(struct_var) (*(io_rw_32 *)&struct_var)
-#define SET_FIELD_SAFE(ptr, field, value)                                      \
+#define SET_FIELD_SAFE(hwreg, type, field, value)                              \
     do {                                                                       \
-        typeof(*(ptr)) temp = *(ptr);                                          \
+        type temp = *(type *)&hwreg;                                           \
         temp.field = value;                                                    \
-        hw_set_bits((io_rw_32 *)(ptr), MPU_FRIENDLY(temp));                    \
+        hwreg = MPU_FRIENDLY(temp);                                            \
     } while (0)
 
 /*
@@ -67,9 +67,9 @@ volatile mpu_rasr_t *mpu_rasr = (mpu_rasr_t *)&mpu_hw->rasr;
 typedef struct {
     unsigned int region             :4;     /* On writes, behavior depends on VALID field. On reads, returns current region number. */
     unsigned int valid              :1;     /* MPU region number valid bit; 0 = use MPU_RNR; 1 = set MPU_RNR to REGION field. */
-    unsigned int /* reserved. */    :0;     /* Size of reserved region depends on region size. */
-    unsigned int addr               :27;    /* Region base address field. Field size is variable w.r.t. region size; see ARM documentation. */
-} __attribute__((packed)) mpu_rbar_t;
+    unsigned int /* reserved. */    :3;
+    unsigned int addr               :24;    /* Region base address field. Field size is variable w.r.t. region size; see ARM documentation. */
+} mpu_rbar_t;
 volatile mpu_rbar_t *mpu_rbar = (mpu_rbar_t *)&mpu_hw->rbar;
 
 /*
@@ -105,8 +105,8 @@ mpu_disable_all_subregions(void)
      * Iterate through all MPU regions and set all disabled bits.
      */
     for (int i = 0; i < MPU_NUM_REGIONS; i++) {
-        SET_FIELD_SAFE(mpu_rnr, region, i);
-        SET_FIELD_SAFE(mpu_rasr, srd, 0b11111111);
+        SET_FIELD_SAFE(mpu_hw->rnr, mpu_rnr_t, region, i);
+        SET_FIELD_SAFE(mpu_hw->rasr, mpu_rasr_t, srd, 0b11111111);
     }
 }
 
@@ -120,8 +120,14 @@ mpu_enable_subregion(void *addr)
         panic("unable to disable non-existant region (addr = %p)", addr);
     }
 
-    SET_FIELD_SAFE(mpu_rnr, region, MPU_REGION(addr));
-    SET_FIELD_SAFE(mpu_rasr, srd, mpu_rasr->srd & ~(1 << MPU_SUBREGION(addr)));
+    SET_FIELD_SAFE(mpu_hw->rnr, mpu_rnr_t, region, MPU_REGION(addr));
+    SET_FIELD_SAFE(mpu_hw->rasr, mpu_rasr_t, srd, mpu_rasr->srd & ~(1 << MPU_SUBREGION(addr)));
+}
+
+void
+foo(volatile void *x)
+{
+    printf("%p", x);
 }
 
 /*
@@ -131,6 +137,12 @@ mpu_enable_subregion(void *addr)
 void
 mpu_init(void)
 {
+    /* solely for debugging so the compiler doesn't optimize these away. */
+    volatile void *k = mpu_rnr; foo(k);
+    volatile void *x = mpu_rbar; foo(x);
+    volatile void *y = mpu_rasr; foo(y);
+    volatile void *z = mpu_ctrl; foo(z);
+
     /*
      * Enable HardFaults to occur in the HardFault and NMI handlers. This
      * behaviour should not occur if things are written properly; it'd be
@@ -145,23 +157,23 @@ mpu_init(void)
      */
     for (int i = 0; i < MPU_NUM_REGIONS; i++) {
         mpu_rbar_t rbar = {
-            .addr       = (SRAM_BASE + i * MPU_REGION_SIZE) >> MPU_REGION_BITS,
+            .addr       = (SRAM_BASE + i * MPU_REGION_SIZE) >> 8,
             .region     = i,
             .valid      = true
         };
-        hw_set_bits((io_rw_32 *)mpu_rbar, MPU_FRIENDLY(rbar));
+        mpu_hw->rbar = MPU_FRIENDLY(rbar);
 
         mpu_rasr_t rasr = {               /* Note: HW does not allow reserved fields to be overwritten, anyway. */
             .enable         = true,
-            .size           = MPU_REGION_BITS,  /* 32 KB. */
+            .size           = MPU_REGION_BITS - 1,  /* 32 KB. */
             .srd            = 0b11111111,       /* All subregions disabled. */
-            .bufferable     = false,
-            .cacheable      = true,
-            .shareable      = false,
+            .bufferable     = 0,
+            .cacheable      = 1,
+            .shareable      = 0,
             .ap             = MPU_AP__RW_RW,    /* Full access. */
             .xn             = 0                 /* Executable. */
         };
-        hw_set_bits((io_rw_32 *)mpu_rasr, MPU_FRIENDLY(rasr));
+        mpu_hw->rasr = MPU_FRIENDLY(rasr);
     }
 
     /*
@@ -172,6 +184,5 @@ mpu_init(void)
         .hfnmiena = true,
         .privdefena = true
     };
-    hw_set_bits((io_rw_32 *)mpu_ctrl, MPU_FRIENDLY(ctrl));
-    mpu_hw->ctrl = 0x3;
+    mpu_hw->ctrl = MPU_FRIENDLY(ctrl);
 }
