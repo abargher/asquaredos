@@ -185,15 +185,15 @@ main(void)
      * "yield" call could be implemented by using the `svc` instruction and
      * registering the schedule_handler as the SVCALL exception handler.
      */
-    exception_set_exclusive_handler(SYSTICK_EXCEPTION, schedule_handler);
+    // exception_set_exclusive_handler(SYSTICK_EXCEPTION, schedule_handler);
     exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
 
-    /* Set SYST_RVR timer reset value */
-    systick_hw->rvr = 0xffffff;  /* TODO: configure this value */
-    /* Configure and enable SysTick counter */
-    systick_hw->csr = 0x7;
+    // /* Set SYST_RVR timer reset value */
+    // systick_hw->rvr = 0xffffff;  /* TODO: configure this value */
+    // /* Configure and enable SysTick counter */
+    // systick_hw->csr = 0x7;
 
     /* Timer interrupt will deschedule this process and never reschedule it. */
-    // asm("svc #0");
+    asm("svc #0");
     while (1) {}
 }

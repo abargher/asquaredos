@@ -389,7 +389,7 @@ void __attribute__((used,naked)) HardFault_Handler(void)
 		"	mov   r7, r11										\n\t"
 		"	push  {r4-r7}										\n\t"
 		"	mov   r3, sp										\n\t"
-		"	bl    fault_handler_with_exception_frame						\n\t"
+		"	bl    fault_handler_with_exception_frame			\n\t"
 		"	pop   {r4-r7}										\n\t"
 		"	mov   r8, r4										\n\t"
 		"	mov   r9, r5										\n\t"
@@ -401,6 +401,36 @@ void __attribute__((used,naked)) HardFault_Handler(void)
 		"not_reentry:											\n\t"
 		//further checks will take place in another context - go there now
 		"	ldr   r2, [r0, #4 * 6]								\n\t"	//exc.PC
+
+		/*
+		 * A2OS modification: check if PC is executable. We'll save the caller
+		 * saved registers, check if the PC is executable, report if it isn't,
+		 * and then restore the registers.
+		 */
+		"	push	{r0-r3}										\n\t" 	/* Save caller-saved regs */
+		"	mov     r0, r12										\n\t"	/* ... */
+		"	push    {r0, lr}									\n\t"	/* ... */
+		"   mov     r0, r2										\n\t"	/* 1st argument = exc.PC */
+		"	bl		mpu_instruction_executable					\n\t"	/* Defined in mpu.c */
+		"   cmp     r0, #" STR(true) "							\n\t"
+		"	pop		{r0}										\n\t"	/* Restore caller-saved regs */
+		"	mov		r12, r0										\n\t"	/* ... */
+		"	pop		{r0}										\n\t"	/* ... */
+		"	mov		lr, r0										\n\t"	/* ... */
+		"	pop		{r0-r3}										\n\t"	/* ... */
+		"	beq     is_executable								\n\t"	/* If it's executable keep on trucking */
+		/* At this point we know exc.PC was not executable. */
+		"	mov   r1, #" STR(EXC_m0_CAUSE_MEM_READ_ACCESS_FAIL) "\n\t"	/* If it wasn't executable, treat it as a read access fail (Gus TODO: add a new cause value) */
+		"	b     call_handler_no_pushed_regs					\n\t"
+
+		/*
+		 * It was executable; resume whatever m0FaultDispatch was doing.
+		 */
+		"is_executable:											\n\t"
+
+		/*
+		 * End of A2OS modification.
+		 */
 		"   adr   r1, check_more_in_custom_mode					\n\t"	//stashed PC
 		"	add   r3, r3, #4									\n\t"	//desired SR
 		"	push  {r1, r3}										\n\t"
@@ -414,7 +444,7 @@ void __attribute__((used,naked)) HardFault_Handler(void)
 		//check more in a safer space (r0 = exc; r2 = exc->pc; lr & sp set for direct return to original exc cause)
 		
 		".balign 4												\n\t"
-		"check_more_in_custom_mode:								\n\t"
+		"check_more_in_custom_mode:								\n\t"		/* gus: we get here -- exc.pc is correct */
 		"	cmp   r0, r0										\n\t"	//set Z
 		"	ldrh  r1, [r2]										\n\t"	//load instr, on failure, branch is skipped too
 		"	b     1f											\n\t"
@@ -422,7 +452,7 @@ void __attribute__((used,naked)) HardFault_Handler(void)
 		"1:														\n\t"	//Z flag is clear on failure, due to the mov above, which is skipped on a succesful read
 		"	bne   access_fail									\n\t"
 		"	lsr   r3, r1, #11									\n\t"
-		"	cmp   r3, #0x1C										\n\t"
+		"	cmp   r3, #0x1C										\n\t"	/* A2OS comment: black magic? this is where we diverge. */
 		"	bls   instr_is_16bits_long							\n\t"
 		
 		//let's read the second half of a 32-bit instr

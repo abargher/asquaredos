@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 #include <hardware/flash.h>
 #include <hardware/exception.h>
@@ -631,7 +632,7 @@ vm_page_fault(pte_group_table_t *pt, void *addr)
 /*
  * TODO: write a descriptive comment for this function.
  */
-__attribute__((noreturn))
+// __attribute__((noreturn))
 void
 fault_handler_with_exception_frame(
     struct CortexExcFrame *exc,
@@ -639,30 +640,30 @@ fault_handler_with_exception_frame(
     uint32_t extra_data,
     struct CortexPushedRegs *hi_regs)
 {
+    bool fault_handled = false;
+
     /*
-     * The VM fault handler is 
+     * Breakpoints are fine (?).
+     *
+     * TODO: verify what behavior should be. I was encountering this in the
+     *       debugger while trying to debug this handler (!)
+     */
+    if (cause == EXC_m0_CAUSE_BKPT_HIT) {
+        asm("bkpt");
+        fault_handled = true;
+    }
+
+    /*
+     * If this was a failure to access memory, treat it as a page fault.
      */
     if (cause == EXC_m0_CAUSE_MEM_READ_ACCESS_FAIL ||
-        cause == EXC_m0_CAUSE_MEM_WRITE_ACCESS_FAIL ||
-        cause == EXC_m0_CAUSE_UNCLASSIFIABLE) {
-
-        /*
-         * In practice it seems to be a reasonable guess than when the result
-         * is "unclassifiable" by m0FaultDispatch, an instruction was executed
-         * that was protected by an eXecute-Never (XN) MPU region.
-         * 
-         * TODO: It also seems that the "default" region is poorly behaved, and
-         * allows execution of SRAM for unprivileged processes... we have two
-         * (ish) regions we can repurpose right now, since each region is 32KB
-         * and our write cache is 64KB (doesn't fine coverage). We can overlay
-         * one of those regions as a "background" no access region.
-         */
-        if (cause == EXC_m0_CAUSE_UNCLASSIFIABLE) {
-            extra_data = exc->pc;
-        }
+        cause == EXC_m0_CAUSE_MEM_WRITE_ACCESS_FAIL) {
 
         vm_page_fault(pcb_active->page_table, (void *)extra_data);  /* extra_data == faulting address. */
+        fault_handled = true;
+    }
 
+    if (fault_handled) {
         /*
          * Re-try the instruction that triggered the fault. Note that this will
          * fail badly if the fault did not occur while it was in thread mode, and
@@ -672,19 +673,21 @@ fault_handler_with_exception_frame(
          * would not occur while executing in handler mode, and we never use the MSP
          * while in thread mode.
          */
-        asm volatile (
-            ".thumb                     \n\t"
-            ".align 4                   \n\t"
-            "mrs    r0, psp             \n\t"
-            "ldr    r1, [r0, #24]       \n\t"   /* Load saved PC from the program stack. */
-            "sub    r1, #2              \n\t"   /* Decrement PC to point at faulting instruction. */
-            "str    r1, [r0, #24]       \n\t"   /* Save modified PC back to the program stack. */
-            "pop    {r0, pc}            \n\t"   /* Return from the exception. */
-            :
-            :
-            : "memory", "r0", "r1");
+        return;
 
-        __builtin_unreachable();
+        // asm volatile (
+        //     ".thumb                     \n\t"
+        //     ".align 4                   \n\t"
+        //     "mrs    r0, psp             \n\t"
+        //     "ldr    r1, [r0, #24]       \n\t"   /* Load saved PC from the program stack. */
+        //     "sub    r1, #1              \n\t"   /* Decrement PC to point at faulting instruction (thumb mode). */
+        //     "str    r1, [r0, #24]       \n\t"   /* Save modified PC back to the program stack. */
+        //     "pop    {r0, pc}            \n\t"   /* Return from the exception. */
+        //     :
+        //     :
+        //     : "memory", "r0", "r1");
+
+        // __builtin_unreachable();
     }
     
     /*
