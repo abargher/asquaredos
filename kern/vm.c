@@ -643,7 +643,23 @@ fault_handler_with_exception_frame(
      * The VM fault handler is 
      */
     if (cause == EXC_m0_CAUSE_MEM_READ_ACCESS_FAIL ||
-        cause == EXC_m0_CAUSE_MEM_WRITE_ACCESS_FAIL) {
+        cause == EXC_m0_CAUSE_MEM_WRITE_ACCESS_FAIL ||
+        cause == EXC_m0_CAUSE_UNCLASSIFIABLE) {
+
+        /*
+         * In practice it seems to be a reasonable guess than when the result
+         * is "unclassifiable" by m0FaultDispatch, an instruction was executed
+         * that was protected by an eXecute-Never (XN) MPU region.
+         * 
+         * TODO: It also seems that the "default" region is poorly behaved, and
+         * allows execution of SRAM for unprivileged processes... we have two
+         * (ish) regions we can repurpose right now, since each region is 32KB
+         * and our write cache is 64KB (doesn't fine coverage). We can overlay
+         * one of those regions as a "background" no access region.
+         */
+        if (cause == EXC_m0_CAUSE_UNCLASSIFIABLE) {
+            extra_data = exc->pc;
+        }
 
         vm_page_fault(pcb_active->page_table, (void *)extra_data);  /* extra_data == faulting address. */
 
