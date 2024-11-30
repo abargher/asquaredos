@@ -16,14 +16,18 @@
  * write the entire register at once.
  * 
  * As a convience, use the SET_FIELD_SAFE macro below, which does this for you.
- * This should be used any time you want to set fewer than ALL of the fields in
- * a hardware register struct.
+ * 
+ * If you want to set more than one field at once, you NEED to cast your value
+ * to something that isn't a struct, and use that to write the register...
+ * 
+ * Thank you GCC.
  */
+#define MPU_FRIENDLY(struct_var) (*(io_rw_32 *)&struct_var)
 #define SET_FIELD_SAFE(ptr, field, value)                                      \
     do {                                                                       \
         typeof(*(ptr)) temp = *(ptr);                                          \
         temp.field = value;                                                    \
-        *(int *)(ptr) = *(int *)&temp; /* because the compiler is stupid. */   \
+        hw_set_bits((io_rw_32 *)(ptr), MPU_FRIENDLY(temp));                    \
     } while (0)
 
 /*
@@ -42,29 +46,29 @@
  * Layout of the MPU_RASR register.
  */
 typedef struct {
-    int enable          :1; /* Region enable bit. */
-    int size            :5; /* Specified the size of the MPU region (2^SIZE). Maximum permitted value is 7. */
-    int /* reserved. */ :2;
-    int srd             :8; /* Subregion disable maps; 0 -> sr enabled; 1 -> sr disabled. */
-    int bufferable      :1; /* Bufferable bit. */
-    int cacheable       :1; /* Cacheable bit. */
-    int shareable       :1; /* Shareable bit. */
-    int /* reserved. */ :5;
-    int ap              :3; /* Access permission field. */
-    int /* reserved. */ :1;
-    int xn              :1; /* Instruction access bit. */
-    int /* reserved. */ :3;
-} __attribute__((packed)) mpu_rasr_t;
+    unsigned int enable             :1; /* Region enable bit. */
+    unsigned int size               :5; /* Specified the size of the MPU region (2^SIZE). Maximum permitted value is 7. */
+    unsigned int /* reserved. */    :2;
+    unsigned int srd                :8; /* Subregion disable maps; 0 -> sr enabled; 1 -> sr disabled. */
+    unsigned int bufferable         :1; /* Bufferable bit. */
+    unsigned int cacheable          :1; /* Cacheable bit. */
+    unsigned int shareable          :1; /* Shareable bit. */
+    unsigned int /* reserved. */    :5;
+    unsigned int ap                 :3; /* Access permission field. */
+    unsigned int /* reserved. */    :1;
+    unsigned int xn                 :1; /* Instruction access bit. */
+    unsigned int /* reserved. */    :3;
+} mpu_rasr_t;
 volatile mpu_rasr_t *mpu_rasr = (mpu_rasr_t *)&mpu_hw->rasr;
 
 /*
  * Layout of the MPU_RBAR register.
  */
 typedef struct {
-    int region          :4;     /* On writes, behavior depends on VALID field. On reads, returns current region number. */
-    int valid           :1;     /* MPU region number valid bit; 0 = use MPU_RNR; 1 = set MPU_RNR to REGION field. */
-    int /* reserved. */ :0;     /* Size of reserved region depends on region size. */
-    int addr            :27;    /* Region base address field. Field size is variable w.r.t. region size; see ARM documentation. */
+    unsigned int region             :4;     /* On writes, behavior depends on VALID field. On reads, returns current region number. */
+    unsigned int valid              :1;     /* MPU region number valid bit; 0 = use MPU_RNR; 1 = set MPU_RNR to REGION field. */
+    unsigned int /* reserved. */    :0;     /* Size of reserved region depends on region size. */
+    unsigned int addr               :27;    /* Region base address field. Field size is variable w.r.t. region size; see ARM documentation. */
 } __attribute__((packed)) mpu_rbar_t;
 volatile mpu_rbar_t *mpu_rbar = (mpu_rbar_t *)&mpu_hw->rbar;
 
@@ -72,20 +76,20 @@ volatile mpu_rbar_t *mpu_rbar = (mpu_rbar_t *)&mpu_hw->rbar;
  * Layout of the MPU_RNR register.
  */
 typedef struct {
-    int region          :8;     /* Indicates the MPU region referenced by MPU_RBAR and MPU_RASR registers. Permitted values are 0-7. */
-    int /* reserved. */ :24;
-} __attribute__((packed)) mpu_rnr_t;
+    unsigned int region             :8;     /* Indicates the MPU region referenced by MPU_RBAR and MPU_RASR registers. Permitted values are 0-7. */
+    unsigned int /* reserved. */    :24;
+} mpu_rnr_t;
 volatile mpu_rnr_t *mpu_rnr = (mpu_rnr_t *)&mpu_hw->rnr;
 
 /*
  * Layout of the MPU_CTRL register.
  */
 typedef struct {
-    int enable          :1;     /* Enables the MPU. */
-    int hfnmiena        :1;     /* Enables the operation of MPU during HardFault and NMI handlers. */
-    int privdefena      :1;     /* Enables privileged software access to the default memory map. */
-    int /* reserved. */ :29;
-} __attribute__((packed)) mpu_ctrl_t;
+    unsigned int enable             :1;     /* Enables the MPU. */
+    unsigned int hfnmiena           :1;     /* Enables the operation of MPU during HardFault and NMI handlers. */
+    unsigned int privdefena         :1;     /* Enables privileged software access to the default memory map. */
+    unsigned int /* reserved. */    :29;
+} mpu_ctrl_t;
 volatile mpu_ctrl_t *mpu_ctrl = (mpu_ctrl_t *)&mpu_hw->ctrl;
 
 
@@ -140,12 +144,14 @@ mpu_init(void)
      * software, and all unprivileged accesses to generate a fault.
      */
     for (int i = 0; i < MPU_NUM_REGIONS; i++) {
-        *mpu_rbar = (mpu_rbar_t){
-            .addr = (SRAM_BASE + i * MPU_REGION_SIZE) >> MPU_REGION_BITS,
-            .region = i,
-            .valid = true
+        mpu_rbar_t rbar = {
+            .addr       = (SRAM_BASE + i * MPU_REGION_SIZE) >> MPU_REGION_BITS,
+            .region     = i,
+            .valid      = true
         };
-        *mpu_rasr = (mpu_rasr_t){               /* Note: HW does not allow reserved fields to be overwritten, anyway. */
+        hw_set_bits((io_rw_32 *)mpu_rbar, MPU_FRIENDLY(rbar));
+
+        mpu_rasr_t rasr = {               /* Note: HW does not allow reserved fields to be overwritten, anyway. */
             .enable         = true,
             .size           = MPU_REGION_BITS,  /* 32 KB. */
             .srd            = 0b11111111,       /* All subregions disabled. */
@@ -155,14 +161,17 @@ mpu_init(void)
             .ap             = MPU_AP__RW_RW,    /* Full access. */
             .xn             = 0                 /* Executable. */
         };
+        hw_set_bits((io_rw_32 *)mpu_rasr, MPU_FRIENDLY(rasr));
     }
 
     /*
      * Enable the MPU.
      */
-    *mpu_ctrl = (mpu_ctrl_t){
+    mpu_ctrl_t ctrl = {
         .enable = true,
         .hfnmiena = true,
         .privdefena = true
     };
+    hw_set_bits((io_rw_32 *)mpu_ctrl, MPU_FRIENDLY(ctrl));
+    mpu_hw->ctrl = 0x3;
 }
