@@ -55,7 +55,7 @@ create_system_resources(
      */
     pcb->page_table = zalloc(KZONE_PTE_GROUP_TABLE);
     assert(pcb->page_table != NULL);
-    for (int i = 0; i < GROUP_SIZE; i++) {
+    for (int i = 0; i < N_GROUPS; i++) {
         pcb->page_table->groups[i] = PTE_GROUP_INVALID;
     }
 
@@ -86,7 +86,7 @@ create_system_resources(
      * faulted into SRAM.
      * 
      * Note: we only fault in a single page here (which will end up faulting in
-     *       4KB, due to a subregion protecting 8x 256B pages) because we only
+     *       4KB, due to a subregion protecting 16x 256B pages) because we only
      *       write a trivial (<< 4KB) amount of data to the stack.
      */
     vm_page_fault(pcb->page_table, (void *)(pcb->saved_sp));
@@ -96,6 +96,15 @@ create_system_resources(
      */
     stack_registers_t *stack_registers = (stack_registers_t *)pcb->saved_sp;
     memset(stack_registers, 0, sizeof(stack_registers_t));
+    stack_registers->r0 = 0x00000000;
+    stack_registers->r1 = 0x01010101;
+    stack_registers->r2 = 0x02020202;
+    stack_registers->r3 = 0x03030303;
+    stack_registers->r4 = 0x04040404;
+    stack_registers->r5 = 0x05050505;
+    stack_registers->r6 = 0x06060606;
+    stack_registers->r7 = 0x07070707;
+    stack_registers->r8 = 0x08080808;
     stack_registers->pc = (register_t)(exec_from)| 1;
     stack_registers->psr = 0x61000000; /* TODO: figure out a (more) correct value for PSR for userprograms. */
 
@@ -127,16 +136,14 @@ main(void)
      */
     kzone_pcb = zalloc(KZONE_PCB);
     assert(kzone_pcb != NULL);
+    kzone_pcb->page_table = zalloc(KZONE_PTE_GROUP_TABLE);  /* Necessary to maintain alignment with PIDs, but kind of a hack. TODO: use a better solution, or free these resources once the scheduler gets going. */
+    assert(kzone_pcb->page_table != NULL);
     pcb_active = kzone_pcb;
 
     /*
      * Initialize the VM system.
      */
     vm_init();
-
-    /* TODO: possibly make a "phony" kernel PCB for as the active PCB to
-     * bootstrap scheduler.
-     */
 
     /*
      * The heap will begin aligned with the first MPU-protectable address after
@@ -150,15 +157,31 @@ main(void)
     heap_free_list->prev = NULL;
     heap_free_list->size = (SRAM_START + SRAM_SIZE) - (uint32_t)heap_start - sizeof(heap_region_t);
 
-    /* Create resources for two pre-loaded programs, already present in flash
+    /*
+     * Create resources for two pre-loaded programs, already present in flash
      * at addresses 0x10020000 and 0x10010000 respectively. Each has a different
      * entrypoint, discovered by reading the symbol tables in their .elf files.
      * Each program is given 60KB of space (more than enough).
      */
-    // create_system_resources((void *)0x10020000, (void *)0x20020000, (void *)0x20020298, (60 * 1024));
-    create_system_resources((void *)0x10010000, (void *)0x20010000, (void *)0x20010298, (60 * 1024));
+    create_system_resources((void *)0x10020000, (void *)0x20020000, (void *)0x20020298, (60 * 1024));
+    // create_system_resources((void *)0x10010000, (void *)0x20010000, (void *)0x20010298, (60 * 1024));
 
-    /* Register the schedule_handler as the timer interrupt handler. A voluntary
+    /*
+     * Unify our stack pointers. TODO: I don't remember why we do this, but we
+     * definitely crash without it -- let's work out why this needs to happen
+     * and document that reason here.
+     */
+    asm volatile(
+        "mrs    r0, msp     \n\t"
+        "msr    psp, r0     \n\t"
+        "isb                \n\t"
+        :
+        :
+        : "r0"
+    );
+
+    /*
+     * Register the schedule_handler as the timer interrupt handler. A voluntary
      * "yield" call could be implemented by using the `svc` instruction and
      * registering the schedule_handler as the SVCALL exception handler.
      */

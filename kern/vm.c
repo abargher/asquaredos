@@ -31,7 +31,7 @@ pid_t write_cache_entry_owner_table[WRITE_CACHE_NUM_ENTRIES];
 /*
  * Bitmap tracking which pages are occupied (1) and free (0) in the region of
  * flash that we evict write cache entries to. The sector bitmap tracks which
- * pages have never been erased (1) and have been erased (0).
+ * pages have never been erased (0) and have been erased (1).
  */
 unsigned char flash_page_bitmap[FLASH_SWAP_NUM_PAGES / 8];
 unsigned char flash_sector_bitmap[FLASH_SWAP_NUM_SECTORS / 8];
@@ -59,7 +59,7 @@ bitmap_find_and_set_first_zero(
     /*
      * Scan the bitmap to identify any 0s.
      */
-    for (int i = 0; i < size_bits; i++) {
+    for (unsigned int i = 0; i < size_bits; i++) {
         unsigned int index = (start_at + i) % size_bits;
 
         /*
@@ -82,7 +82,7 @@ bitmap_find_and_set_first_zero(
          *       dense lookup table with 256 entries --> 256 * 3 bits = 
          *       96 bytes to make that table).
          */
-        for (int j = 0; j < 8; j++) {
+        for (unsigned int j = 0; j < 8; j++) {
             if (bitmap_entry & (1 << j)) {
                 /*
                  * Claim the free page and return its index.
@@ -181,7 +181,7 @@ vm_procure_flash_page(void)
          * succeeded in resetting all bits to 1).
          */
         unsigned int n_failures = 0;
-        for (int i = 0; i < FLASH_SECTOR_SIZE; i++) {
+        for (unsigned int i = 0; i < FLASH_SECTOR_SIZE; i++) {
             if (*(FLASH_SWAP_BASE + sector_index * FLASH_SECTOR_SIZE + i) != 0xFF) {
                 n_failures++;
             }
@@ -292,7 +292,7 @@ vm_find_cache_victim(void)
              * have already scanned the bitmap for a free page) then we'll just
              * use this page and make sure it's marked in the bitmap.
              */
-            write_cache_bitmap[index / 8] |= (1 << index % 8);
+            write_cache_bitmap[index / 8] |= (1 << (index & 0b111));    /* & 0b111 is equivalent to % 8. */
             return address_to_pte(pt, CACHE_PAGE(index++));
         }
         pte_t *pte = address_to_pte(pt, CACHE_PAGE(index));
@@ -468,30 +468,34 @@ vm_read_in_subregion(
          * Initialize the PTEs as pointing to the page they represent in SRAM,
          * and register the PTE group.
          */
-        for (int i = 0; i < GROUP_SIZE; i++) {
-            pte_t *pte = &pte_group->ptes[i];
-            pte->type = PTE_SRAM;
-            pte->sram.page_number = PAGE_NUMBER(subregion) + i;
+        for (unsigned int i = 0; i < GROUP_SIZE; i++) {
+            pte_group->ptes[i].type = PTE_INVALID;
         }
         pt->groups[GROUP(subregion)] = GROUP_INDEX(pte_group);
-
-        /*
-         * Is the memset necessary? Not sure what the performance hit is, but it
-         * means memory contents won't be leaked between processes.
-         */
-        memset(subregion, 0, MPU_SUBREGION_SIZE);
-
-        return;
     }
 
     /*
-     * PTEs already exist to map these pages, which means we can just copy in
-     * the content pointed to by those PTEs.
+     * PTEs already exist to map these pages.
      */
     for (page_t *page = subregion;
-         (uintptr_t)page < (uintptr_t)(subregion + MPU_REGION_SIZE);
+         (uintptr_t)page < (uintptr_t)(subregion + MPU_SUBREGION_SIZE);
          page++) {
         pte_t *pte = address_to_pte(pt, page);
+
+        /*
+         * If the PTE is still invalid, we make it a valid SRAM PTE and zero the
+         * contents of the page.
+         */
+        if (pte->type == PTE_INVALID) {
+            pte->type = PTE_SRAM;
+            pte->sram.page_number = PAGE_NUMBER(page);
+            memset(page, 0, PAGE_SIZE);
+            continue;
+        }
+
+        /*
+         * Otherwise, we copy in the real contents of the page.
+         */
         memcpy(page, vm_get_page_contents(pte), PAGE_SIZE);
     }
 }
@@ -541,11 +545,33 @@ vm_map_generic_flash_page(
 void
 vm_init(void)
 {
-    exception_set_exclusive_handler(HARDFAULT_EXCEPTION, HardFault_Handler);
+    /*
+     * SRAM begins as un-owned and empty.
+     */
+    for (unsigned int i = 0; i < sizeof(sram_page_owner_table); i++) {
+        sram_page_owner_table[i] = PID_INVALID;
+    }
 
     /*
-     * Beware all of SRAM will now be inaccessible in thread mode.
+     * Flash begins as completely unoccupied and unerased.
      */
+    memset(flash_page_bitmap, 0x00, sizeof(flash_page_bitmap));
+    memset(flash_sector_bitmap, 0x00, sizeof(flash_sector_bitmap));
+
+    /*
+     * Write cache begins as un-owned and empty.
+     */
+    memset(write_cache_bitmap, 0x00, sizeof(write_cache_bitmap));
+    for (unsigned int i = 0; i < sizeof(write_cache_entry_owner_table); i++) {
+        write_cache_entry_owner_table[i] = PID_INVALID;
+    }
+
+    /*
+     * Begin using our custom HardFault handler and initialize the MPU. Beware
+     * that all of SRAM will now be inaccessible from thread mode (until pages
+     * are faulted in).
+     */
+    exception_set_exclusive_handler(HARDFAULT_EXCEPTION, HardFault_Handler);
     mpu_init();
 }
 

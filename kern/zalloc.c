@@ -11,7 +11,7 @@ kzone_desc_t zone_table[N_KZONES];
 /*
  * Define the size of each zone.
  */
-#define PCB_ZONE_ELEMS (MAX_PROCESSES + 1)
+#define PCB_ZONE_ELEMS (MAX_PROCESSES)
 #define PTE_GROUP_ZONE_ELEMS (255)  /* Absolutely must not exceed 255. The index of the 256th element is reserved for PTE_GROUP_INVALID. */
 #define PTE_GROUP_TABLE_ZONE_ELEMS (MAX_PROCESSES)
 

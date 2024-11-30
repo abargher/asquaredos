@@ -75,12 +75,12 @@ extern char __bss_end__;
 #define VM_END ((void *)SRAM_STRIPED_END)
 
 /*
- * Process identifier. Valid values are 1-15, inclusive. Used by the address to
+ * Process identifier. Valid values are 0-14, inclusive. Used by the address to
  * process conversion map.
  */
-#define MAX_PROCESSES   (16)
-#define PID_INVALID     ((pid_t)0)  /* Used to indicate page has no owner. */
-#define PID_MIN         ((pid_t)1)
+#define MAX_PROCESSES   (15)
+#define PID_INVALID     ((pid_t)15)  /* Used to indicate page has no owner. */
+#define PID_MIN         ((pid_t)0)
 #define PID_MAX         ((pid_t)(MAX_PROCESSES - 1))
 typedef unsigned char pid_t;
 
@@ -197,7 +197,7 @@ typedef union {                     /* 16 bits. */
 #define INDEX(addr)         (((unsigned)(addr) >> OFFSET_BITS) & INDEX_MASK)
 #define OFFSET(addr)        ((unsigned)(addr) & OFFSET_MASK)
 
-#define GROUP_INDEX(addr) (((addr) - pte_groups_base) / sizeof(pte_group_t))
+#define GROUP_INDEX(addr) ((pte_group_index_t)((pte_group_t *)(addr) - (pte_group_t *)pte_groups_base))
 
 /*
  * A single 256 byte page. Can be present in SRAM, write cache, or flash.
@@ -230,7 +230,7 @@ typedef struct {
     pte_group_index_t groups[N_GROUPS];
 } pte_group_table_t;
 
-#define PID_FROM_GROUP_TABLE(group_table_ptr) (((group_table_ptr) - pte_group_tables_base) / sizeof(pte_group_table_t))
+#define PID_FROM_GROUP_TABLE(group_table_ptr) ((pid_t)((pte_group_table_t *)(group_table_ptr) - (pte_group_table_t *)pte_group_tables_base))
 
 /*
  * Exported functions.

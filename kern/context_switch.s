@@ -44,6 +44,20 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+.macro SAVE_CALLER_REGS
+    push    {r0-r3}         @ Push r0-r3 onto the stack.
+    mov     r0, r12         @ Move r12 (hi) into r0 (lo).
+    push    {r0, lr}        @ Push r12 (as r0) and lr onto the stack.
+.endm
+
+.macro RESTORE_CALLER_REGS
+    pop     {r0}            @ Pop r12 (as r0) off the stack.
+    mov     r12, r0         @ Move r0 back into r12.
+    pop     {r0}            @ Pop lr (as r0) off the stack.
+    mov     lr, r0          @ Move r0 back into lr.
+    pop     {r0-r3}         @ Pop r0-r3 and lr off the stack.
+.endm
+
 .thumb_func
 .global schedule_handler
 .align 4
@@ -55,7 +69,6 @@ schedule_handler:
     cmp     r0, r1                      @ Check if next to schedule == pcb_active
     beq     schedule_handler_return     @ If we're scheduling the active process then this is a no-op
     str     r0, [r3]                    @ Store the new next to schedule process at pcb_active
-    bl      mpu_disable_all_subregions  @ Re-protect all of memory from the new process
     bl      context_switch
 
 .thumb_func
@@ -83,8 +96,20 @@ context_switch:
     /* Save to-be-descheduled SP and load to-be-scheduled SP */
     mov     r2, sp          @ Save the to-be-descheduled program's now-updated SP into r2
     mov     sp, r3          @ Load the kernel's stack pointer from r3 (where we left it)
-    str     r2, [r1]        @ Store the to-be-descheduled program's SP into *r0 from r2, i.e., the "saved SP" field in its PCB
-    ldr     r2, [r0]        @ Load the to-be-scheduled program's SP from *r1 into r2, i.e., the "saved SP" field of the to-be-scheduled PCB
+    str     r2, [r1]        @ Store the to-be-descheduled program's SP into *r1 from r2, i.e., the "saved SP" field in its PCB
+    ldr     r2, [r0]        @ Load the to-be-scheduled program's SP from *r0 into r2, i.e., the "saved SP" field of the to-be-scheduled PCB
+
+    /* Prepare the VM system for the new process. */
+    mov     r5, r0                          @ We only need the values of r0, r2, and lr after the below function calls
+    mov     r6, r2
+    mov     r7, lr
+    bl      mpu_disable_all_subregions      @ Re-protect all of memory from the new process
+    mov     r0, r5                          @ Restore the r0 value we saved earlier
+    ldr     r0, [r0, #4]                    @ Load the to-be-scheduled program's page table pointer from *r0+4 (2nd field) into r0, to be the first argument to vm_page_fault
+    mov     r1, r6                          @ Load the r2 value we saved earlier into r6 (program's stack pointer, i.e., the faulting address)
+    bl      vm_page_fault                   @ Fault in the stack pointer
+    mov     r2, r6                          @ Restore the value of r2
+    mov     lr, r7                          @ Restore the value of lr
 
     /* Restore r8-r11 */
     ldmia   r2!, {r4-r7}    @ Using r2 (the saved SP of the to-be-scheduled program), load the saved values of r8-r11 into r4-r7 (inverse of save procedure)
