@@ -67,8 +67,8 @@ volatile mpu_rasr_t *mpu_rasr = (mpu_rasr_t *)&mpu_hw->rasr;
 typedef struct {
     unsigned int region             :4;     /* On writes, behavior depends on VALID field. On reads, returns current region number. */
     unsigned int valid              :1;     /* MPU region number valid bit; 0 = use MPU_RNR; 1 = set MPU_RNR to REGION field. */
-    unsigned int /* reserved. */    :3;
-    unsigned int addr               :24;    /* Region base address field. Field size is variable w.r.t. region size; see ARM documentation. */
+    unsigned int /* reserved. */    :10;
+    unsigned int addr               :17;    /* Region base address field. Bits [31:N], where N=log2(region size) = 15. */
 } mpu_rbar_t;
 volatile mpu_rbar_t *mpu_rbar = (mpu_rbar_t *)&mpu_hw->rbar;
 
@@ -157,7 +157,7 @@ mpu_init(void)
      */
     for (int i = 0; i < MPU_NUM_REGIONS; i++) {
         mpu_rbar_t rbar = {
-            .addr       = (SRAM_BASE + i * MPU_REGION_SIZE) >> 8,
+            .addr       = (SRAM_BASE + i * MPU_REGION_SIZE) >> MPU_REGION_BITS,
             .region     = i,
             .valid      = true
         };
@@ -171,7 +171,7 @@ mpu_init(void)
             .cacheable      = 1,
             .shareable      = 0,
             .ap             = MPU_AP__RW_RW,    /* Full access. */
-            .xn             = 0                 /* Executable. */
+            .xn             = 1                 /* Executable. */
         };
         mpu_hw->rasr = MPU_FRIENDLY(rasr);
     }
