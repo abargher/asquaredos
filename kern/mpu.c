@@ -10,6 +10,23 @@
  */
 
 /*
+ * BEWARE! Do no try to write to the MPU registers via the bit fields defined in
+ * these structs! The compiler will use single-byte instructions (e.g., strb)
+ * which will NOT work. Instead, prepare an entire instance of the struct, and
+ * write the entire register at once.
+ * 
+ * As a convience, use the SET_FIELD_SAFE macro below, which does this for you.
+ * This should be used any time you want to set fewer than ALL of the fields in
+ * a hardware register struct.
+ */
+#define SET_FIELD_SAFE(ptr, field, value)                                      \
+    do {                                                                       \
+        typeof(*(ptr)) temp = *(ptr);                                          \
+        temp.field = value;                                                    \
+        *(int *)(ptr) = *(int *)&temp; /* because the compiler is stupid. */   \
+    } while (0)
+
+/*
  * Allowed values for the AP field of MPU_RASR. Named as:
  *
  *  MPU_AP__<PRIV>_<UNPRIV>
@@ -71,6 +88,9 @@ typedef struct {
 } __attribute__((packed)) mpu_ctrl_t;
 volatile mpu_ctrl_t *mpu_ctrl = (mpu_ctrl_t *)&mpu_hw->ctrl;
 
+
+#define MPU_CTRL_SET_ENABLE(enable) SET_BITS_OF_WORD(mpu_hw->ctrl, 0, 1, enable)
+
 /*
  * Disable all subregions of all MPU regions.
  */
@@ -81,8 +101,8 @@ mpu_disable_all_subregions(void)
      * Iterate through all MPU regions and set all disabled bits.
      */
     for (int i = 0; i < MPU_NUM_REGIONS; i++) {
-        mpu_rnr->region = i;
-        mpu_rasr->srd = 0b11111111;
+        SET_FIELD_SAFE(mpu_rnr, region, i);
+        SET_FIELD_SAFE(mpu_rasr, srd, 0b11111111);
     }
 }
 
@@ -96,8 +116,8 @@ mpu_enable_subregion(void *addr)
         panic("unable to disable non-existant region (addr = %p)", addr);
     }
 
-    mpu_rnr->region = MPU_REGION(addr);
-    mpu_rasr->srd &= ~(1 << MPU_SUBREGION(addr));
+    SET_FIELD_SAFE(mpu_rnr, region, MPU_REGION(addr));
+    SET_FIELD_SAFE(mpu_rasr, srd, mpu_rasr->srd & ~(1 << MPU_SUBREGION(addr)));
 }
 
 /*
@@ -107,8 +127,12 @@ mpu_enable_subregion(void *addr)
 void
 mpu_init(void)
 {
-    mpu_ctrl->hfnmiena = true;
-    mpu_ctrl->privdefena = true;
+    /*
+     * Enable HardFaults to occur in the HardFault and NMI handlers. This
+     * behaviour should not occur if things are written properly; it'd be
+     * better to know sooner via a hardfault than later by a long debugging
+     * session.
+     */
 
     /*
      * Configure each region as R/W/X and enable the region, but disable all of
@@ -116,20 +140,29 @@ mpu_init(void)
      * software, and all unprivileged accesses to generate a fault.
      */
     for (int i = 0; i < MPU_NUM_REGIONS; i++) {
-        mpu_rbar->valid = true;
-        mpu_rbar->region = i;
-        mpu_rbar->addr = SRAM_BASE + (i << MPU_REGION_BITS);
+        *mpu_rbar = (mpu_rbar_t){
+            .addr = (SRAM_BASE + i * MPU_REGION_SIZE) >> MPU_REGION_BITS,
+            .region = i,
+            .valid = true
+        };
         *mpu_rasr = (mpu_rasr_t){               /* Note: HW does not allow reserved fields to be overwritten, anyway. */
             .enable         = true,
             .size           = MPU_REGION_BITS,  /* 32 KB. */
             .srd            = 0b11111111,       /* All subregions disabled. */
-            .bufferable     = true,
+            .bufferable     = false,
             .cacheable      = true,
-            .shareable      = true,
+            .shareable      = false,
             .ap             = MPU_AP__RW_RW,    /* Full access. */
-            .xn             = 0,                /* Executable. */
+            .xn             = 0                 /* Executable. */
         };
     }
 
-    mpu_ctrl->enable = true;
+    /*
+     * Enable the MPU.
+     */
+    *mpu_ctrl = (mpu_ctrl_t){
+        .enable = true,
+        .hfnmiena = true,
+        .privdefena = true
+    };
 }

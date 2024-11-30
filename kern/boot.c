@@ -171,7 +171,7 @@ main(void)
      * definitely crash without it -- let's work out why this needs to happen
      * and document that reason here.
      */
-    asm volatile(
+    asm volatile (
         "mrs    r0, msp     \n\t"
         "msr    psp, r0     \n\t"
         "isb                \n\t"
