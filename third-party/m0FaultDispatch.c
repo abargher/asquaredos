@@ -421,7 +421,7 @@ void __attribute__((used,naked)) HardFault_Handler(void)
 		"	beq     is_executable								\n\t"	/* If it's executable keep on trucking */
 		/* At this point we know exc.PC was not executable. */
 		"	mov   r1, #" STR(EXC_m0_CAUSE_MEM_READ_ACCESS_FAIL) "\n\t"	/* If it wasn't executable, treat it as a read access fail (Gus TODO: add a new cause value) */
-		"	b     call_handler_no_pushed_regs					\n\t"
+		"	b     call_handler_no_pushed_regs					\n\t"	/* Note that exc.PC still in r2, so it will be extra_data to fault_handler_with_exception_frame */
 
 		/*
 		 * It was executable; resume whatever m0FaultDispatch was doing.

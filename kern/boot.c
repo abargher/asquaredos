@@ -163,8 +163,8 @@ main(void)
      * entrypoint, discovered by reading the symbol tables in their .elf files.
      * Each program is given 60KB of space (more than enough).
      */
-    // create_system_resources((void *)0x10020000, (void *)0x20020000, (void *)0x2002032d, 32 * KB);   /* Empty while loop. */
-    create_system_resources((void *)0x10030000, (void *)0x20020000, (void *)0x2002032d, 32 * KB);   /* Light flasher. */
+    create_system_resources((void *)0x10020000, (void *)0x20020000, (void *)0x2002032d, 32 * KB);   /* External LED flasher. */
+    create_system_resources((void *)0x10030000, (void *)0x20020000, (void *)0x2002032d, 32 * KB);   /* Onboard LED flasher. */
     // create_system_resources((void *)0x10010000, (void *)0x20010000, (void *)0x20010298, (60 * 1024));
 
     /*
@@ -186,15 +186,15 @@ main(void)
      * "yield" call could be implemented by using the `svc` instruction and
      * registering the schedule_handler as the SVCALL exception handler.
      */
-    // exception_set_exclusive_handler(SYSTICK_EXCEPTION, schedule_handler);
+    exception_set_exclusive_handler(SYSTICK_EXCEPTION, schedule_handler);
     exception_set_exclusive_handler(SVCALL_EXCEPTION, schedule_handler);
 
-    // /* Set SYST_RVR timer reset value */
-    // systick_hw->rvr = 0xffffff;  /* TODO: configure this value */
-    // /* Configure and enable SysTick counter */
-    // systick_hw->csr = 0x7;
+    /* Set SYST_RVR timer reset value */
+    systick_hw->rvr = 0xffffff;  /* TODO: configure this value */
+    /* Configure and enable SysTick counter */
+    systick_hw->csr = 0x7;
 
     /* Timer interrupt will deschedule this process and never reschedule it. */
-    asm("svc #0");
+    // asm("svc #0");
     while (1) {}
 }

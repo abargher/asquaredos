@@ -126,7 +126,7 @@ typedef unsigned char cache_index_t;
 /*
  * Convert a cache_index_t to the address of the page it represents.
  */
-#define CACHE_PAGE(cache_index) (write_cache + 256 * (cache_index))
+#define CACHE_PAGE(cache_index) (((void *)write_cache) + (PAGE_SIZE * (cache_index)))
 
 /*
  * Page table entry for a 256B page stored in the write cache.
