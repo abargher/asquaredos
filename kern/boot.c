@@ -163,7 +163,8 @@ main(void)
      * entrypoint, discovered by reading the symbol tables in their .elf files.
      * Each program is given 60KB of space (more than enough).
      */
-    create_system_resources((void *)0x10020000, (void *)0x20020000, (void *)0x2002032c, 16 * KB);
+    // create_system_resources((void *)0x10020000, (void *)0x20020000, (void *)0x2002032d, 32 * KB);   /* Empty while loop. */
+    create_system_resources((void *)0x10030000, (void *)0x20020000, (void *)0x2002032d, 32 * KB);   /* Light flasher. */
     // create_system_resources((void *)0x10010000, (void *)0x20010000, (void *)0x20010298, (60 * 1024));
 
     /*

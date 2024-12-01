@@ -193,9 +193,26 @@ mpu_init(void)
      */
 
     /*
+     * All of memory background region.
+     */
+    SET_RBAR(0, 0);
+    rasr = (mpu_rasr_t) {
+        .enable         = 1,
+        .size           = 31,
+        .srd            = 0b00000000,
+        .bufferable     = 0,
+        .cacheable      = 1,
+        .shareable      = 0,
+        .ap             = MPU_AP__RW_RW,
+        .xn             = 0
+    };
+    mpu_hw->rasr = MPU_FRIENDLY(rasr);
+
+
+    /*
      * SRAM background region.
      */
-    SET_RBAR(SRAM_BASE, 0);
+    SET_RBAR(SRAM_BASE, 1);
     rasr = (mpu_rasr_t) {
         .enable         = 1,
         .size           = 17,               /* 2 << 17 == 256KB. */

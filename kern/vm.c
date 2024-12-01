@@ -643,17 +643,6 @@ fault_handler_with_exception_frame(
     bool fault_handled = false;
 
     /*
-     * Breakpoints are fine (?).
-     *
-     * TODO: verify what behavior should be. I was encountering this in the
-     *       debugger while trying to debug this handler (!)
-     */
-    if (cause == EXC_m0_CAUSE_BKPT_HIT) {
-        asm("bkpt");
-        fault_handled = true;
-    }
-
-    /*
      * If this was a failure to access memory, treat it as a page fault.
      */
     if (cause == EXC_m0_CAUSE_MEM_READ_ACCESS_FAIL ||
@@ -673,21 +662,12 @@ fault_handler_with_exception_frame(
          * would not occur while executing in handler mode, and we never use the MSP
          * while in thread mode.
          */
+        asm volatile (
+            "isb    \n\t"
+            "dsb    \n\t"
+            ::: "memory"
+        );
         return;
-
-        // asm volatile (
-        //     ".thumb                     \n\t"
-        //     ".align 4                   \n\t"
-        //     "mrs    r0, psp             \n\t"
-        //     "ldr    r1, [r0, #24]       \n\t"   /* Load saved PC from the program stack. */
-        //     "sub    r1, #1              \n\t"   /* Decrement PC to point at faulting instruction (thumb mode). */
-        //     "str    r1, [r0, #24]       \n\t"   /* Save modified PC back to the program stack. */
-        //     "pop    {r0, pc}            \n\t"   /* Return from the exception. */
-        //     :
-        //     :
-        //     : "memory", "r0", "r1");
-
-        // __builtin_unreachable();
     }
     
     /*
