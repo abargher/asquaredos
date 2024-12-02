@@ -25,24 +25,16 @@
 // }
 
 int main() {
-  // while (1);
-  // int delay = 1000;
-  // Initialise I/O
-  // stdio_init_all();
-  // timer_hw->dbgpause = 0;
-
-  // initialise GPIO (Green LED connected to pin 25)
+  /* Initialize GPIO (Green LED connected to pin 25). */
   gpio_init(2);
   gpio_set_dir(2, GPIO_OUT);
 
-  // Main Loop
+  /* Main Loop. */
   while (1) {
-    gpio_put(2, 1);  // Set pin 25 to high
+    gpio_put(2, 1);  /* Set pin 25 to high. */
     for (int i = 0; i < 4 * 1024 * 1024; i++) {}
-    // sleep_ms(delay/2);  // 1.0s delay
-    gpio_put(2, 0);  // Set pin 25 to low
+    gpio_put(2, 0);  /* Set pin 25 to low. */
     for (int i = 0; i < 4 * 1024 * 1024; i++) {}
-    // sleep_ms(delay/2);  // 1.0s delay
   }
 }
 
