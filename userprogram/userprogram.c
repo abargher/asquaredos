@@ -24,16 +24,17 @@
 //   }
 // }
 
+/* Flash pin 2. */
 int main() {
-  /* Initialize GPIO (Green LED connected to pin 25). */
+  /* Initialize GPIO (External LED connected to pin 2). */
   gpio_init(2);
   gpio_set_dir(2, GPIO_OUT);
 
   /* Main Loop. */
   while (1) {
-    gpio_put(2, 1);  /* Set pin 25 to high. */
+    gpio_put(2, 1);  /* Set pin 2 to high. */
     for (int i = 0; i < 4 * 1024 * 1024; i++) {}
-    gpio_put(2, 0);  /* Set pin 25 to low. */
+    gpio_put(2, 0);  /* Set pin 2 to low. */
     for (int i = 0; i < 4 * 1024 * 1024; i++) {}
   }
 }
