@@ -168,9 +168,14 @@ main(void)
     // create_system_resources((void *)0x10010000, (void *)0x20010000, (void *)0x20010298, (60 * 1024));
 
     /*
-     * Unify our stack pointers. TODO: I don't remember why we do this, but we
-     * definitely crash without it -- let's work out why this needs to happen
-     * and document that reason here.
+     * Unify our stack pointers. This is required because we're currently using
+     * the main stack pointer (MSP), and the program stack pointer (PSP) is,
+     * until this point, uninitialized. When the first context switch occurs it
+     * will attempt to push register values relative to PSP, which would crash
+     * if we didn't give it a reasonable value here. We never resume execution
+     * after that context switch, however, so where those register values end up
+     * isn't particularly important as long as they don't cause a HardFault or
+     * overwrite state we've already set up.
      */
     asm volatile (
         "mrs    r0, msp     \n\t"
