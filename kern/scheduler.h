@@ -37,8 +37,7 @@ typedef struct heap_region {
  * 
  * The saved stack pointer will be located in the process's PCB.
  */
-__attribute__((packed))
-struct stack_registers {
+typedef struct {
     register_t r8;
     register_t r9;
     register_t r10;
@@ -58,8 +57,7 @@ struct stack_registers {
     register_t lr;
     register_t pc;
     register_t psr;
-};
-typedef struct stack_registers stack_registers_t;
+} __attribute__((packed)) stack_registers_t;
 
 /*
  * Process control block containing the data and references required to manage

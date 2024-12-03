@@ -22,6 +22,10 @@ pcb_t               zone_pcbs[PCB_ZONE_ELEMS];
 pte_group_t         zone_pte_groups[PTE_GROUP_ZONE_ELEMS];
 pte_group_table_t   zone_pte_group_tables[PTE_GROUP_TABLE_ZONE_ELEMS];
 
+int x = sizeof(zone_pte_groups);
+int y = sizeof(zone_pte_group_tables);
+int z = sizeof(zone_pcbs);
+
 
 /*
  * Export the base of the pte_group_t and pte_group_table_t zones. They are
