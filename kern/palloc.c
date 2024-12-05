@@ -3,7 +3,6 @@
 #include <stdio.h>
 
 #include "utils/list.h"
-#include "utils/panic.h"
 #include "resources.h"
 #include <stddef.h>
 
