@@ -146,4 +146,56 @@ and user programs into their correct memory locations without relying on the
 standard RP2040 bootloader, the kernel can return to its initial first-boot
 state when recovering from a reset or power loss.
 
+\section{Implementation progress}
+\textbf{NOTE}: All of the text in this section and any following sections can
+and should probably be changed-- this is a general idea outline for now.
+
+\textbf{TODO}: include the following expansions on the content:
+
+\begin{itemize}
+    \item some preliminary results 
+    \item discussions of limitations and related works
+\end{itemize}
+
+\textbf{TODO}: Integrate changes into the previous sections and cut out content
+from proposal that is no longer relevant or correct.
+\vspace{1em}
+
+The biggest change from the originally proposed design is the inclusion of a
+virtual memory system. Although the RP2040 does not have a memory management
+unit (MMU) to properly support address translation and paging, our virtual
+memory implementation uses the \emph{memory protection unit} (MPU) to
+approximate the behavior of a page fault. This is coupled with a custom
+HardFault handler which is able to deduce the cause of a HardFault, and if it
+is a ``page fault'', then initiate our custom page fault handler and reexecute
+the faulting instruction.
+
+
+\section{Design evolution}
+Much of the general design has remained from the original proposal, however, a
+few critical elements have changed in the current version of the system.
+
+\subsection{Process address space isolation}
+The introduction of the virtual memory system allows us to properly isolate
+the address spaces of user programs from the kernel and each other. When VM is
+enabled, user programs can be linked to identical addresses. Since code and data
+are paged in lazily upon context switch to a new process, user programs can
+never access the contents of another user program's address space. MPU
+protections are reset on every context switch so that the current process's
+content is freshly paged in on each access. The MPU also protects the kernel
+space so that it is only accessible from an interrupt context and never from
+standard user program mode.
+
+\subsubsection{Limitations of address space isolation}
+Due to the limited number of configurable (sub)regions provided by the MPU, the
+virtual memory system is only able to properly isolate the portion of the
+address space covering SRAM. Flash and other memory-mapped devices are not
+protected by the MPU, and it is thus the responsibility of user programs to not
+access the same shared resources. This is a limitation that could be improved on
+in the future by providing a library for user programs that allows the kernel
+to manage the sharing of resources like the serial port, GPIO pins, and more.
+
+
+\section{Current limitations}
+
 \end{document}
