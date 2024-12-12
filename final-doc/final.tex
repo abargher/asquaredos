@@ -151,13 +151,23 @@ standard RP2040 bootloader, the kernel can return to its initial first-boot
 state when recovering from a reset or power loss.
 
 \section{Implementation progress}
+
+We successfully implemented both multiprocessing with preemptive scheduling, and
+a surprisingly well-featured (given hardware limitations) virtual memory system
+which provides both address space isolation and demand paging for user programs.
+
+Using \os we were able to run two ordinary, unmodified user programs, which were
+each able to independently control peripherals via GPIO pins. Both programs'
+binaries were linked to begin from the \emph{same address}, and our VM system
+successfully paged in the contents of each program's respective binary from
+flash on demand.
+
 \textbf{NOTE}: All of the text in this section and any following sections can
 and should probably be changed-- this is a general idea outline for now.
 
 \textbf{TODO}: include the following expansions on the content:
 
 \begin{itemize}
-    \item some preliminary results 
     \item discussions of limitations and related works
 \end{itemize}
 
