@@ -1,0 +1,232 @@
+\documentclass[12pt]{article}
+\usepackage[colorlinks,allcolors=blue]{hyperref}
+% \usepackage{amsmath,amsfonts,graphicx,amssymb}
+% \usepackage{latexsym}
+% \usepackage{subfig}
+% \usepackage{svg}
+% \usepackage{enumitem}
+% \usepackage{adjmulticol}
+% \usepackage{listings}
+\usepackage[
+  margin=2.5cm,
+  includefoot,
+  footskip=30pt,
+]{geometry}
+
+\newcommand\fnsep{\textsuperscript{,}}
+\newcommand{\os}{\texttt{A$^2$OS} }
+\newcommand{\osns}{\texttt{A$^2$OS}}
+
+\title{\texttt{A$^2$OS}: a minimal OS for the Raspberry Pi Pico}
+\author{Alec Bargher and Gus Waldspurger}
+\date{\href{https://github.com/abargher/asquaredos}{Source code available on GitHub}}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+\os is a minimal operating system for the RP2040 microcontroller, providing
+context switching, preemptive process scheduling, and virtual memory, enabling
+seamless multiprogramming. Although the system was developed on a Raspberry Pi
+Pico, we believe that \os can, with minimal modifications, be compatible with
+most RP2040-based boards.
+
+\vspace{.5em}
+
+\os implements a minimal kernel, responsible for creating, destroying, and
+scheduling user processes. The kernel performs no background tasks, and thus
+after the initial boot sequence it executes only asynchronously when interrupt
+handlers are invoked. Users load the kernel onto the board once, and may then
+flash an arbitrary set of user programs specifically compiled and linked for
+compatibility with \os.
+
+\section{Motivation}
+
+\os is largely motivated by the desire to timeshare an ARM Cortex M0+ processor.
+This architecture---of which the RP2040 is a notable example---offer a powerful
+compute platform while maintaining extremely low cost and power requirements.
+Microcontrollers like the RP2040 are, thus, desirable for a variety of complex
+embedded applications. However, properly taking advantage of the resources these
+processors offer can be challenging and often impractical due to the burden of
+CPU and memory management being placed entirely on the programmer. \os hopes to
+solve this issue.
+
+With \osns, CPU management is abstracted away; the programmer is now responsible
+only for the sharing and synchronization of other, more diverse system
+resources (e.g., I/O). Furthermore, \os provides a well-featured virtual memory
+system with address space isolation and demand paging, abstracting away the need
+to consider how memory needs to be laid out and accessed by multiple independent
+processes.
+
+\section{Existing Work \& References}
+
+The problem of context switching and process/task scheduling for
+microcontrollers is not a new one, and there are a variety of existing solutions
+for this problem. For example,
+\href{https://www.freertos.org/Documentation/02-Kernel/02-Kernel-features/01-Tasks-and-co-routines/00-Tasks-and-co-routines#characteristics-of-a-task}{FreeRTOS}
+provides task scheduling, context switching, and dynamic memory allocation, but
+also includes a plethora of other features, including a TCP stack, stream
+buffers for inter-task communication, and synchronization primitives like
+semaphores and locks. Although in some use cases these features will be useful,
+we see the simplicity and limited feature set of \os as a benefit. This allows
+us to minimize memory and processing overhead for the kernel, reserving the vast
+majority of system resources for user processes. More specialized
+microcontroller operating systems have also implemented multitasking, including
+\href{https://www.youtube.com/watch?v=yHqaspeGJRw}{Chromium-EC}\footnote{We
+referenced this talk and its corresponding slides while implementing context
+switching.}.
+
+Unlike these existing solutions, \os aims to provide a general and freely
+available solution to multitasking by providing only the minimal facilities
+required to effectively share CPU time and main memory, rather than implementing
+an entire Real Time OS (RTOS). \os also differentiates itself from these other
+solutions through its optional virtual memory system. No other systems provide
+this feature directly due to the lack of hardware support, but by using and 
+modifying the
+\href{https://dmitry.gr/?r=05.Projects&proj=27.%20m0FaultDispatch}{\texttt{m0FaultDispatch} project}
+by Dmitry Grinberg, we infer extra information about the cause of a
+HardFault, allowing us to implement a virtual memory system.
+
+
+\section{System Design}
+\subsection{Kernel layout}
+In designing \os, we prioritized reducing complexity, while also handling the
+constraints of the RP2040 platform. We place the kernel at the top of physical
+memory, with fixed memory addresses for its critical global variables and
+structures. Because the RP2040 includes two regions of memory---4 banks of 64KB
+SRAM which are striped to form a 256KB region, and also 2 banks of 4KB at the
+top of the SRAM address range---we restrict user programs to accessing the 256KB
+of striped SRAM not occupied by kernel state, and then leave the 4KB scratch
+banks for the kernel's stack. Kernel state includes:
+\begin{itemize}
+    \item {A pointer to the process control block (PCB) of the currently active
+    process,}
+    \item A pointer to the scheduler's ready queue,
+    \item Memory zones and associated metadata for use by the zone allocator,
+    \item {A 64KB "write cache" used as an additional memory tier that allows
+    the most frequently dirtied pages to remain in SRAM, rather than to flash,
+    thus reducing the number of flash write-erase cycles.}
+\end{itemize}
+In sum, the kernel consumes roughly 72KB of the 256KB of the available striped
+SRAM. The \emph{large} size of the write cache is necessitated by the limited
+number of protection regions offered by the MPU. Only 8 regions exist, and 2
+regions must be used as "background" regions to ensure the correct permissions
+are used for non-SRAM addresses, and when an MPU subregion is disabled. This
+leaves just 6 configurable regions for the VM system, and because regions' sizes
+must be a power of 2, we decided to use 32KB regions, allowing up to 192KB of
+striped SRAM to be managed by the VM system. Thus, as 64KB would be unusable by
+user programs, we decided to make a very large write cache, as its size directly
+correlates to reduced flash wear.
+%% Continue with more on kernel layout here...
+
+\subsection{Memory Allocation}
+The Pi Pico, like many other microcontrollers, maps its peripherals and other
+hardware components to memory addresses in an extended address space which
+exceeds the total size of physical memory. Hardware peripherals accessed by
+their memory-mapped addresses are not currently managed by \osns.
+
+The kernel's state is largely organized as a series of zones, which are managed
+by a zone allocator. The zone allocator is used only by the kernel to allocate
+fixed-size elements from these pre-allocated zones of kernel memory, organized
+by element type. This system is currently only used to maintain PCBs, but is
+general and may be trivially expanded with additional zones.
+
+All physical memory (SRAM) not occupied by the kernel is managed by a
+kernel-private heap allocator, which is utilized whenever process-owned memory
+must be allocated. For example, the heap is used to allocate each process's
+fixed-size (4KB) stack at the time of that process's creation. The
+implementation of an efficient userspace heap is left as a responsibility for
+the programmer, if desired.\footnote{Note
+that the kernel's heap allocator is (currently) an extremely simple one. It
+makes no attempts to reduce fragmentation, and will choose the first available
+block on the heap that can fit the requested memory.}
+
+%% Add more miscellaneous elements here, or add more sections above this line.
+\subsection{Other design elements}
+As long as users are careful to only flash programs set up properly for \osns,
+then the kernel will not need to be re-flashed. This feature is provided by
+\osns's boot sequence and fixed kernel location and layout. Since \os user
+programs are never saved to the same location as the kernel and the flash memory
+is not fully cleared, user programs will not overwrite the kernel when flashed
+correctly.
+
+Since the kernel implements a ``third stage'' bootloader that loads the kernel
+and user programs into their correct memory locations without relying on the
+standard RP2040 bootloader, the kernel can return to its initial first-boot
+state when recovering from a reset or power loss.
+
+\section{Implementation progress}
+
+We successfully implemented both multiprocessing with preemptive scheduling, and
+a surprisingly well-featured (given hardware limitations) virtual memory system
+which provides both address space isolation and demand paging for user programs.
+
+The biggest change from the originally proposed design is the inclusion of a
+virtual memory system. Although the RP2040 does not have a memory management
+unit (MMU) to properly support address translation and paging, we were able
+to co-opt the \emph{memory protection unit} (MPU) to emulate the behavior of a
+page fault. We use the MPU, together with a custom HardFault handler, in order
+to deduce the cause of a HardFault, and initiate our custom page fault handler
+for relevant MPU-related faults.
+
+Using \os we were able to run two ordinary, unmodified user programs, which were
+each able to independently control peripherals via GPIO pins. Both programs'
+binaries were linked to begin from the \emph{same address}, and our VM system
+successfully paged in the contents of each program's respective binary from
+flash on demand.
+
+
+\section{Design evolution}
+Much of the general design has remained from the original proposal, however, a
+few critical elements have changed in the current version of the system.
+
+\subsection{Process address space isolation}
+The introduction of the virtual memory system allows us to properly isolate
+the address spaces of user programs from the kernel, and from each other.
+When VM is enabled, user programs can be linked to arbitrary (potentially
+identical or overlapping) addresses. Since code and data are paged in lazily
+upon context switch to a new process, user programs can never access the
+contents of another user program's address space. MPU protections are reset on
+every context switch so that the current process's content is freshly paged in
+on each access. The MPU also protects the kernel's state (which is maintained in
+a disjoint region of memory from process address spaces, and is not managed by
+the VM system) so that it is only accessible from an interrupt context and never
+from standard user program mode.
+
+\subsection{Userprogram memory allocation}
+With the introduction of the virtual memory system, there is no longer any need
+for a system call providing heap memory allocation to user programs. Now, all
+user programs are able to access the entire memory address space, as if there
+were no OS at all, so the virtual memory system will simply page in a 
+zero-filled page whenever a new region of the address space is accessed for the
+first time.
+
+\section{Current limitations}
+
+\subsection{Limitations of address space isolation}
+Due to the limited number of configurable (sub)regions provided by the MPU, the
+virtual memory system is only able to properly isolate the portion of the
+address space covering SRAM. Flash and other memory-mapped devices are not
+protected by the MPU, and it is thus the responsibility of user programs to not
+access the same shared resources. This limitation could be addressed by
+preventing all userspace accesses outside of SRAM, and implementing system calls
+to manage hardware components such as flash storage and other peripherals. We
+chose not to pursue this approach due to the significant performance cost which
+would be incurred by user programs.
+
+\subsection{Thrashing in Virtual Memory}
+In our proof-of-concept testing, we executed multiple independent user programs
+that were each linked to the same memory addresses. This means the text and data
+sections of each program overlap each other in the address space, as do the
+user program stacks, since the kernel places user program stacks in the same 
+place. This placement will cause a significant amount of
+``thrashing'' as each program has to page in its data to the same, already
+occupied region of memory every time a context switch occurs. Ideally, this
+thrashing could be improved by compiling user programs properly with
+position-independent code and allowing the kernel to intelligently place 
+programs in different regions of the address space to minimize overlaps. We
+were unsuccessful in getting position-independent code to execute properly in
+our first attempts, but this is a limitation that could be revisited in the
+future.
+
+\end{document}
