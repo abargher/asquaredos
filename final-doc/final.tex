@@ -180,14 +180,16 @@ few critical elements have changed in the current version of the system.
 
 \subsection{Process address space isolation}
 The introduction of the virtual memory system allows us to properly isolate
-the address spaces of user programs from the kernel and each other. When VM is
-enabled, user programs can be linked to identical addresses. Since code and data
-are paged in lazily upon context switch to a new process, user programs can
-never access the contents of another user program's address space. MPU
-protections are reset on every context switch so that the current process's
-content is freshly paged in on each access. The MPU also protects the kernel
-space so that it is only accessible from an interrupt context and never from
-standard user program mode.
+the address spaces of user programs from the kernel, and from and each other.
+When VM is enabled, user programs can be linked to arbitrary (potentially
+identical or overlapping) addresses. Since code and data are paged in lazily
+upon context switch to a new process, user programs can never access the
+contents of another user program's address space. MPU protections are reset on
+every context switch so that the current process's content is freshly paged in
+on each access. The MPU also protects the kernel's state (which is maintained in
+a disjoint region of memory from process address spaces, and is not managed by
+the VM system) so that it is only accessible from an interrupt context and never
+from standard user program mode.
 
 \subsubsection{Limitations of address space isolation}
 Due to the limited number of configurable (sub)regions provided by the MPU, the
