@@ -43,9 +43,9 @@ compatibility with \os.
 \section{Motivation}
 
 \os is largely motivated by the desire to timeshare an ARM Cortex M0+ processor.
-This architecture---of which the RP2040 is notable example---offer a powerful
+This architecture---of which the RP2040 is a notable example---offer a powerful
 compute platform while maintaining extremely low cost and power requirements.
-Microcontrollers like the RP2040 are thus desirable for a variety of complex
+Microcontrollers like the RP2040 are, thus, desirable for a variety of complex
 embedded applications. However, properly taking advantage of the resources these
 processors offer can be challenging and often impractical due to the burden of
 CPU and memory management being placed entirely on the programmer. \os hopes to
@@ -53,9 +53,9 @@ solve this issue.
 
 With \osns, CPU management is abstracted away; the programmer is now responsible
 only for the sharing and synchronization of other, more diverse system
-resources (e.g., I/O). Furthermose, \os provides a well-featured virtual memory
+resources (e.g., I/O). Furthermore, \os provides a well-featured virtual memory
 system with address space isolation and demand paging, abstracting away the need
-consider how memory need be laid out and accessed by multiple independent
+to consider how memory needs to be laid out and accessed by multiple independent
 processes.
 
 \section{Existing Work \& References}
@@ -108,7 +108,7 @@ banks for the kernel's stack. Kernel state includes:
     thus reducing the number of flash write-erase cycles.}
 \end{itemize}
 In sum, the kernel consumes roughly 72KB of the 256KB of the available striped
-SRAM. The \emph{large} size of the write cache is necesitated by the limited
+SRAM. The \emph{large} size of the write cache is necessitated by the limited
 number of protection regions offered by the MPU. Only 8 regions exist, and 2
 regions must be used as "background" regions to ensure the correct permissions
 are used for non-SRAM addresses, and when an MPU subregion is disabled. This
@@ -134,7 +134,7 @@ general and may be trivially expanded with additional zones.
 All physical memory (SRAM) not occupied by the kernel is managed by a
 kernel-private heap allocator, which is utilized whenever process-owned memory
 must be allocated. For example, the heap is used to allocate each process's
-fixed size (4KB) stack at the time of that process's creation. The
+fixed-size (4KB) stack at the time of that process's creation. The
 implementation of an efficient userspace heap is left as a responsibility for
 the programmer, if desired.\footnote{Note
 that the kernel's heap allocator is (currently) an extremely simple one. It
@@ -182,7 +182,7 @@ few critical elements have changed in the current version of the system.
 
 \subsection{Process address space isolation}
 The introduction of the virtual memory system allows us to properly isolate
-the address spaces of user programs from the kernel, and from and each other.
+the address spaces of user programs from the kernel, and from each other.
 When VM is enabled, user programs can be linked to arbitrary (potentially
 identical or overlapping) addresses. Since code and data are paged in lazily
 upon context switch to a new process, user programs can never access the
@@ -211,7 +211,7 @@ protected by the MPU, and it is thus the responsibility of user programs to not
 access the same shared resources. This limitation could be addressed by
 preventing all userspace accesses outside of SRAM, and implementing system calls
 to manage hardware components such as flash storage and other peripherals. We
-chose not to pursure this approach due to the significant performance cost which
+chose not to pursue this approach due to the significant performance cost which
 would be incurred by user programs.
 
 \subsection{Thrashing in Virtual Memory}
