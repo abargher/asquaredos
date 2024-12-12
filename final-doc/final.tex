@@ -91,23 +91,32 @@ HardFault, allowing us to implement a virtual memory system.
 \section{System Design}
 \subsection{Kernel layout}
 In designing \os, we prioritized reducing complexity, while also handling the
-constraints of the RP2040 platform---the largest of which is the lack of
-hardware support for virtual memory. Virtual memory is uncommon for
-microcontrollers, so embedded programs typically deal with hardware memory
-addresses directly. Lacking the isolation afforded by virtual memory, we chose
-to place the kernel at the top of physical memory, with fixed memory addresses
-for its critical global variables and structures, and a fixed-size stack for its
-few function calls. By fixing the size and location of the kernel, the memory
-protection unit (MPU) can be used to minimally isolate kernel state from
-userspace programs. The kernel maintains structures for tracking
+constraints of the RP2040 platform. We place the kernel at the top of physical
+memory, with fixed memory addresses for its critical global variables and
+structures. Because the RP2040 includes two regions of memory---4 banks of 64KB
+SRAM which are striped to for a 256KB region, and also 2 banks of 4KB at the
+top of the SRAM address range---we restrict user programs to accessing the 256KB
+of striped SRAM not occupied by kernel state, and then leave the 4KB scratch
+banks for the kernel's stack. Kernel state includes:
 \begin{itemize}
     \item {A pointer to the process control block (PCB) of the currently active
     process,}
     \item A pointer to the scheduler's ready queue,
-    \item A pointer to the heap allocator's free blocks list,
     \item Memory zones and associated metadata for use by the zone allocator,
+    \item {A 64KB "write cache" used as an additional memory tier that allows
+    the most frequently dirtied pages to remain in SRAM, rather than to flash,
+    thus reducing the number of flash write-erase cycles}
 \end{itemize}
-among the other state the kernel must maintain.
+In sum, the kernel consumes roughly 72KB of the 256KB of the available striped
+SRAM. The \emph{large} size of the write cache is necesitated by the limited
+number of protection regions offered by the MPU. Only 8 regions exist, and 2
+regions must be used as "background" regions to ensure the correct permissions
+are used for non-SRAM addresses, and when an MPU subregion is disabled. This
+leaves just 6 configurable regions for the VM system, and because regions' sizes
+must be a power of 2, we decided to use 32KB regions, allowing up to 192KB of
+striped SRAM to be managed by the VM system. Thus, as 64KB would be unusable by
+user programs, we decided to make a very large write cache, as its size directly
+correlates to reduced flash wear.
 %% Continue with more on kernel layout here...
 
 \subsection{Memory Allocation}
