@@ -84,7 +84,7 @@ solutions through its optional virtual memory system. No other systems provide
 this feature directly due to the lack of hardware support, but by using and 
 modifying the
 \href{https://dmitry.gr/?r=05.Projects&proj=27.%20m0FaultDispatch}{\texttt{m0FaultDispatch} project}
-by Dmitry Grinberg, we could infer extra information about the cause of a
+by Dmitry Grinberg, we infer extra information about the cause of a
 HardFault, allowing us to implement a virtual memory system.
 
 
@@ -227,5 +227,20 @@ preventing all userspace accesses outside of SRAM, and implementing system calls
 to manage hardware components such as flash storage and other peripherals. We
 chose not to pursure this approach due to the significant performance cost which
 would be incurred by user programs.
+
+\subsection{Thrashing in Virtual Memory}
+In our proof-of-concept testing, we executed multiple independent user programs
+that were each linked to the same memory addresses. This means the text and data
+sections of each program overlap each other in the address space, as do the
+user program stacks, since the kernel places user program stacks in the same 
+place. This placement will cause a significant amount of
+``thrashing'' as each program has to page in its data to the same, already
+occupied region of memory every time a context switch occurs. Ideally, this
+thrashing could be improved by compiling user programs properly with
+position-independent code and allowing the kernel to intelligently place 
+programs in different regions of the address space to minimize overlaps. We
+were unsuccessful in getting position-independent code to execute properly in
+our first attempts, but this is a limitation that could be revisited in the
+future.
 
 \end{document}
