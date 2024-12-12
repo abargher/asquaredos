@@ -198,7 +198,17 @@ a disjoint region of memory from process address spaces, and is not managed by
 the VM system) so that it is only accessible from an interrupt context and never
 from standard user program mode.
 
-\subsubsection{Limitations of address space isolation}
+\subsection{Userprogram memory allocation}
+With the introduction of the virtual memory system, there is no longer any need
+for a system call providing heap memory allocation to user programs. Now, all
+user programs are able to access the entire memory address space, as if there
+were no OS at all, so the virtual memory system will simply page in a 
+zero-filled page whenever a new region of the address space is accessed for the
+first time.
+
+\section{Current limitations}
+
+\subsection{Limitations of address space isolation}
 Due to the limited number of configurable (sub)regions provided by the MPU, the
 virtual memory system is only able to properly isolate the portion of the
 address space covering SRAM. Flash and other memory-mapped devices are not
@@ -208,8 +218,5 @@ preventing all userspace accesses outside of SRAM, and implementing system calls
 to manage hardware components such as flash storage and other peripherals. We
 chose not to pursure this approach due to the significant performance cost which
 would be incurred by user programs.
-
-
-\section{Current limitations}
 
 \end{document}
