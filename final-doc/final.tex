@@ -198,9 +198,11 @@ Due to the limited number of configurable (sub)regions provided by the MPU, the
 virtual memory system is only able to properly isolate the portion of the
 address space covering SRAM. Flash and other memory-mapped devices are not
 protected by the MPU, and it is thus the responsibility of user programs to not
-access the same shared resources. This is a limitation that could be improved on
-in the future by providing a library for user programs that allows the kernel
-to manage the sharing of resources like the serial port, GPIO pins, and more.
+access the same shared resources. This limitation could be addressed by
+preventing all userspace accesses outside of SRAM, and implementing system calls
+to manage hardware components such as flash storage and other peripherals. We
+chose not to pursure this approach due to the significant performance cost which
+would be incurred by user programs.
 
 
 \section{Current limitations}
