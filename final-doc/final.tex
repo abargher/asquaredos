@@ -152,6 +152,14 @@ We successfully implemented both multiprocessing with preemptive scheduling, and
 a surprisingly well-featured (given hardware limitations) virtual memory system
 which provides both address space isolation and demand paging for user programs.
 
+The biggest change from the originally proposed design is the inclusion of a
+virtual memory system. Although the RP2040 does not have a memory management
+unit (MMU) to properly support address translation and paging, we were able
+to co-opt the \emph{memory protection unit} (MPU) to emulate the behavior of a
+page fault. We use the MPU, together with a custom HardFault handler, in order
+to deduce the cause of a HardFault, and initiate our custom page fault handler
+for relevant MPU-related faults.
+
 Using \os we were able to run two ordinary, unmodified user programs, which were
 each able to independently control peripherals via GPIO pins. Both programs'
 binaries were linked to begin from the \emph{same address}, and our VM system
@@ -171,13 +179,6 @@ and should probably be changed-- this is a general idea outline for now.
 from proposal that is no longer relevant or correct.
 \vspace{1em}
 
-The biggest change from the originally proposed design is the inclusion of a
-virtual memory system. Although the RP2040 does not have a memory management
-unit (MMU) to properly support address translation and paging, we were able
-to co-opt the \emph{memory protection unit} (MPU) to emulate the behavior of a
-page fault. We use the MPU, together with a custom HardFault handler, in order
-to deduce the cause of a HardFault, and initiate our custom page fault handler
-for relevant MPU-related faults.
 
 
 \section{Design evolution}
