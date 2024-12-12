@@ -17,7 +17,7 @@
 \newcommand{\os}{\texttt{A$^2$OS} }
 \newcommand{\osns}{\texttt{A$^2$OS}}
 
-\title{\texttt{A$^2$OS}: a minimal ``OS'' for the Raspberry Pi Pico}
+\title{\texttt{A$^2$OS}: a minimal OS for the Raspberry Pi Pico}
 \author{Alec Bargher and Gus Waldspurger}
 \date{}
 
@@ -25,10 +25,11 @@
 \maketitle
 
 \section{Introduction}
-\os is a minimal ``operating system'' for the RP2040 microcontroller, providing
-context switching and process scheduling, enabling seamless multiprogramming.
-Although the system is implemented using a Raspberry Pi Pico, we hope that \os
-will be compatible with any application of the RP2040 chip with minimal
+\os is a minimal operating system for the RP2040 microcontroller, providing
+context switching, process scheduling, and an emulated ``virtual memory''
+system, enabling seamless multiprogramming.
+Although the system is implemented using a Raspberry Pi Pico, we believe that
+\os can be compatible with any application of the RP2040 chip with minimal
 modification.
 
 \vspace{.5em}
@@ -78,7 +79,8 @@ switching.}.
 Unlike these existing solutions, \os aims to provide a general and freely
 available solution to multitasking by providing only the minimal facilities
 required to effectively share CPU time and main memory, rather than implementing
-an entire Real Time OS (RTOS).
+an entire Real Time OS (RTOS). \os also differentiates itself from these other
+solutions through its optional virtual memory system.
 
 
 \section{System Design}
