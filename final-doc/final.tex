@@ -80,7 +80,12 @@ Unlike these existing solutions, \os aims to provide a general and freely
 available solution to multitasking by providing only the minimal facilities
 required to effectively share CPU time and main memory, rather than implementing
 an entire Real Time OS (RTOS). \os also differentiates itself from these other
-solutions through its optional virtual memory system.
+solutions through its optional virtual memory system. No other systems provide
+this feature directly due to the lack of hardware support, but by using and 
+modifying the
+\href{https://dmitry.gr/?r=05.Projects&proj=27.%20m0FaultDispatch}{\texttt{m0FaultDispatch} project}
+by Dmitry Grinberg, we could infer extra information about the cause of a
+HardFault, allowing us to implement a virtual memory system.
 
 
 \section{System Design}
@@ -120,23 +125,12 @@ general and may be trivially expanded with additional zones.
 All physical memory (SRAM) not occupied by the kernel is managed by a
 kernel-private heap allocator, which is utilized whenever process-owned memory
 must be allocated. For example, the heap is used to allocate each process's
-fixed size (4KB) stack at the time of that process's creation. Note that code
-sections of a process are stored in executable flash (XIP) storage, rather than
-in memory. Processes may also explicitly request and release memory via system
-call, which is ultimately managed via the same kernel-private heap. The
+fixed size (4KB) stack at the time of that process's creation. The
 implementation of an efficient userspace heap is left as a responsibility for
-the programmer.\footnote{Note
+the programmer, if desired.\footnote{Note
 that the kernel's heap allocator is (currently) an extremely simple one. It
 makes no attempts to reduce fragmentation, and will choose the first available
-block on the heap that can fit the requested memory.}\fnsep
-\footnote{Security-minded readers may also notice that because the kernel doles
-out memory from the entirety of SRAM (except the kernel's private state), there
-is no isolation of any in-memory process data between processes. While this is
-unfortunate, it is ultimately unavoidable due to the MPU's limit of protecting
-just 8 regions---insufficient to provide proper protection to each block of
-memory allocated by the kernel for a user process. Handling this lack of
-isolation is thus made the responsibility of the programmer and system
-operator.}
+block on the heap that can fit the requested memory.}
 
 %% Add more miscellaneous elements here, or add more sections above this line.
 \subsection{Other design elements}
