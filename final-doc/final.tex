@@ -94,7 +94,7 @@ In designing \os, we prioritized reducing complexity, while also handling the
 constraints of the RP2040 platform. We place the kernel at the top of physical
 memory, with fixed memory addresses for its critical global variables and
 structures. Because the RP2040 includes two regions of memory---4 banks of 64KB
-SRAM which are striped to for a 256KB region, and also 2 banks of 4KB at the
+SRAM which are striped to form a 256KB region, and also 2 banks of 4KB at the
 top of the SRAM address range---we restrict user programs to accessing the 256KB
 of striped SRAM not occupied by kernel state, and then leave the 4KB scratch
 banks for the kernel's stack. Kernel state includes:
@@ -105,7 +105,7 @@ banks for the kernel's stack. Kernel state includes:
     \item Memory zones and associated metadata for use by the zone allocator,
     \item {A 64KB "write cache" used as an additional memory tier that allows
     the most frequently dirtied pages to remain in SRAM, rather than to flash,
-    thus reducing the number of flash write-erase cycles}
+    thus reducing the number of flash write-erase cycles.}
 \end{itemize}
 In sum, the kernel consumes roughly 72KB of the 256KB of the available striped
 SRAM. The \emph{large} size of the write cache is necesitated by the limited
