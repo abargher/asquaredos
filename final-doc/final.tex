@@ -7,7 +7,7 @@
 % \usepackage{enumitem}
 % \usepackage{adjmulticol}
 % \usepackage{listings}
-\usepackage{fullpage}
+% \usepackage{fullpage}
 
 \newcommand\fnsep{\textsuperscript{,}}
 \newcommand{\os}{\texttt{A$^2$OS} }
@@ -163,12 +163,11 @@ from proposal that is no longer relevant or correct.
 
 The biggest change from the originally proposed design is the inclusion of a
 virtual memory system. Although the RP2040 does not have a memory management
-unit (MMU) to properly support address translation and paging, our virtual
-memory implementation uses the \emph{memory protection unit} (MPU) to
-approximate the behavior of a page fault. This is coupled with a custom
-HardFault handler which is able to deduce the cause of a HardFault, and if it
-is a ``page fault'', then initiate our custom page fault handler and reexecute
-the faulting instruction.
+unit (MMU) to properly support address translation and paging, we were able
+to co-opt the \emph{memory protection unit} (MPU) to emulate the behavior of a
+page fault. We use the MPU, together with a custom HardFault handler, in order
+to deduce the cause of a HardFault, and initiate our custom page fault handler
+for relevant MPU-related faults.
 
 
 \section{Design evolution}
