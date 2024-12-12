@@ -26,37 +26,37 @@
 
 \section{Introduction}
 \os is a minimal operating system for the RP2040 microcontroller, providing
-context switching, process scheduling, and an emulated ``virtual memory''
-system, enabling seamless multiprogramming.
-Although the system is implemented using a Raspberry Pi Pico, we believe that
-\os can be compatible with any application of the RP2040 chip with minimal
-modification.
+context switching, preemptive process scheduling, and virtual memory, enabling
+seamless multiprogramming. Although the system was developed on a Raspberry Pi
+Pico, we believe that \os can, with minimal modifications, be compatible with
+most RP2040-based boards.
 
 \vspace{.5em}
 
 \os implements a minimal kernel, responsible for creating, destroying, and
-scheduling ``user'' processes. Basic utilities are also provided for these
-processes, in the form of system calls to acquire and release memory. As the
-kernel performs no background tasks, its code is only executed asynchronously
-after the initial boot sequence is completed, whenever users or system resources
-trigger an interrupt. Users will load the kernel onto the board once, and may
-then flash an arbitrary set of user programs specifically compiled and linked
-for compatibility with \os.
+scheduling user processes. The kernel performs no background tasks, and thus
+after the initial boot sequence it executes only asynchronously when interrupt
+handlers are invoked. Users load the kernel onto the board once, and may then
+flash an arbitrary set of user programs specifically compiled and linked for
+compatibility with \os.
 
 \section{Motivation}
 
-\os is largely motivated by the desire to share CPU time on an ARM Cortex M0+
-processor. This architecture---of which the RP2040 is notable example---offer a
-powerful compute platform while maintaining extremely low cost and power
-requirements. Processors like the RP2040 are thus desirable for a variety of
-complex embedded applications. However, properly taking advantage of the
-power these processors offer can be challenging and impractical due to the
-burden of CPU management being placed entirely on the programmer. \os hopes to
+\os is largely motivated by the desire to timeshare an ARM Cortex M0+ processor.
+This architecture---of which the RP2040 is notable example---offer a powerful
+compute platform while maintaining extremely low cost and power requirements.
+Microcontrollers like the RP2040 are thus desirable for a variety of complex
+embedded applications. However, properly taking advantage of the resources these
+processors offer can be challenging and often impractical due to the burden of
+CPU and memory management being placed entirely on the programmer. \os hopes to
 solve this issue.
 
 With \osns, CPU management is abstracted away; the programmer is now responsible
 only for the sharing and synchronization of other, more diverse system
-resources (e.g., I/O).
+resources (e.g., I/O). Furthermose, \os provides a well-featured virtual memory
+system with address space isolation and demand paging, abstracting away the need
+consider how memory need be laid out and accessed by multiple independent
+processes.
 
 \section{Existing Work \& References}
 
