@@ -6,6 +6,7 @@
 #ifndef __SCHED_H__
 #define __SCHED_H__
 #include <stdint.h>
+#include "vm.h"
 
 /*
  * 32-bit register value.
@@ -36,8 +37,7 @@ typedef struct heap_region {
  * 
  * The saved stack pointer will be located in the process's PCB.
  */
-__attribute__((packed))
-struct stack_registers {
+typedef struct {
     register_t r8;
     register_t r9;
     register_t r10;
@@ -57,16 +57,21 @@ struct stack_registers {
     register_t lr;
     register_t pc;
     register_t psr;
-};
-typedef struct stack_registers stack_registers_t;
+} __attribute__((packed)) stack_registers_t;
 
 /*
  * Process control block containing the data and references required to manage
  * a running process.
  */
 typedef struct process_control_block {
-    register_t      saved_sp;       /* Saved stack pointer to recover other registers. */
-    heap_region_t  *allocated;      /* List of allocated heap regions. */
+    register_t          saved_sp;       /* Saved stack pointer to recover other registers. */
+    pte_group_table_t  *page_table;     /* Base of the process' page table. */
+
+    /*
+     * WARNING: Do not cause the order/offsets of the fields before this point
+     *          to change; context_switch.s depends on these offsets.
+     */
+    heap_region_t      *allocated;      /* List of allocated heap regions. */
 
     /*
      * Queue management fields.
