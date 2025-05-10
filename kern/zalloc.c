@@ -1,19 +1,38 @@
 #include "zalloc.h"
 #include "scheduler.h"
 #include "utils/list.h"
-#include "utils/panic.h"
 #include <string.h>
 
 /*
  * State tracking for all allocator zones.
  */
-kzone_desc_t zone_table[N_KZONES]; //__attribute__((section("kernel_private_state")));
+kzone_desc_t zone_table[N_KZONES];
+
+/*
+ * Define the size of each zone.
+ */
+#define PCB_ZONE_ELEMS (MAX_PROCESSES)
+#define PTE_GROUP_ZONE_ELEMS (255)  /* Absolutely must not exceed 255. The index of the 256th element is reserved for PTE_GROUP_INVALID. */
+#define PTE_GROUP_TABLE_ZONE_ELEMS (MAX_PROCESSES)
 
 /*
  * Create each zone.
  */
-#define PCB_ZONE_ELEMS 32
-pcb_t zone_pcbs[PCB_ZONE_ELEMS];
+pcb_t               zone_pcbs[PCB_ZONE_ELEMS];
+pte_group_t         zone_pte_groups[PTE_GROUP_ZONE_ELEMS];
+pte_group_table_t   zone_pte_group_tables[PTE_GROUP_TABLE_ZONE_ELEMS];
+
+int x = sizeof(zone_pte_groups);
+int y = sizeof(zone_pte_group_tables);
+int z = sizeof(zone_pcbs);
+
+
+/*
+ * Export the base of the pte_group_t and pte_group_table_t zones. They are
+ * required for looking up a PTE from an address.
+ */
+pte_group_t        *pte_groups_base         = zone_pte_groups - 1;
+pte_group_table_t  *pte_group_tables_base   = zone_pte_group_tables;
 
 
 /*
@@ -46,6 +65,8 @@ zinit(void)
     kzone_desc_t *desc;
 
     initialize_zone(KZONE_PCB, PCB_ZONE_ELEMS, sizeof(pcb_t), zone_pcbs);
+    initialize_zone(KZONE_PTE_GROUP, PTE_GROUP_ZONE_ELEMS, sizeof(pte_group_t), zone_pte_groups);
+    initialize_zone(KZONE_PTE_GROUP_TABLE, PTE_GROUP_TABLE_ZONE_ELEMS, sizeof(pte_group_table_t), zone_pte_group_tables);
     /*
      * Register the next zone here.
      */

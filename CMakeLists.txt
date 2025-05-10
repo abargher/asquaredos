@@ -43,10 +43,14 @@ add_executable(asquaredos
     kern/palloc.c
     kern/zalloc.c
     kern/resources.c
+    kern/mpu.c
+    kern/vm.c
 
     kern/scheduler.c
 
     kern/context_switch.s
+
+    third-party/m0FaultDispatch.c
 )
 
 pico_set_program_name(asquaredos "asquaredos")
@@ -65,6 +69,7 @@ target_link_libraries(asquaredos
         hardware_exception
         hardware_ticks
         hardware_structs
+        hardware_flash
         )
 
 # Add the standard include files to the build
